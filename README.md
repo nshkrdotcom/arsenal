@@ -577,7 +577,7 @@ docs = Arsenal.generate_api_docs()
 ### Project Structure
 
 ```mermaid
-flowchart TD
+flowchart LR
     A[arsenal/] --> B[lib/]
     A --> C[test/]
     A --> D[mix.exs]
