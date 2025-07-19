@@ -271,7 +271,7 @@ defmodule Examples.ProcessManagement.TracingTools do
     :erlang.trace_pattern({:_, :_, :_}, false, [:local])
     :erlang.trace(:all, false, [:all])
     
-    Logger.warn("Emergency stop of all traces")
+    Logger.warning("Emergency stop of all traces")
     
     {:reply, :ok, %{state | active_traces: %{}, trace_events: %{}}}
   end

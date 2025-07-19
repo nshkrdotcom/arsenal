@@ -110,10 +110,10 @@ defmodule Examples.Analytics.BasicMonitoring do
   
   @impl true
   def handle_call(:get_restart_summary, _from, state) do
-    supervisors = Arsenal.Operations.ListSupervisors.execute(%{})
+    supervisors_result = Arsenal.Operations.ListSupervisors.execute(%{})
     
-    restart_stats = case supervisors do
-      {:ok, supervisor_list} ->
+    restart_stats = case supervisors_result do
+      {:ok, {supervisor_list, _meta}} ->
         Enum.map(supervisor_list, fn supervisor ->
           case Arsenal.AnalyticsServer.get_restart_statistics(supervisor.pid) do
             {:ok, stats} ->
@@ -200,7 +200,7 @@ defmodule Examples.Analytics.BasicMonitoring do
     
     # Check for restart storm (5+ restarts of same child in 1 minute)
     if event_data.restart_count >= 5 do
-      Logger.warn("Restart storm detected!", 
+      Logger.warning("Restart storm detected!", 
         child: event_data.child_id,
         supervisor: event_data.supervisor,
         count: event_data.restart_count
@@ -213,7 +213,7 @@ defmodule Examples.Analytics.BasicMonitoring do
   end
   
   defp handle_analytics_event(:health_alert, event_data, state) do
-    Logger.warn("Health alert received", alert: event_data)
+    Logger.warning("Health alert received", alert: event_data)
     
     alert = %{
       type: :health_alert,
@@ -227,7 +227,7 @@ defmodule Examples.Analytics.BasicMonitoring do
   end
   
   defp handle_analytics_event(:performance_alert, event_data, state) do
-    Logger.warn("Performance alert received", alert: event_data)
+    Logger.warning("Performance alert received", alert: event_data)
     
     alert = %{
       type: :performance_alert,
@@ -241,7 +241,7 @@ defmodule Examples.Analytics.BasicMonitoring do
   end
   
   defp handle_analytics_event(:anomaly, event_data, state) do
-    Logger.warn("Anomaly detected", anomaly: event_data)
+    Logger.warning("Anomaly detected", anomaly: event_data)
     
     case event_data.severity do
       :high ->
@@ -300,7 +300,7 @@ defmodule Examples.Analytics.BasicMonitoring do
   end
   
   defp send_anomaly_alert(anomaly_data) do
-    Logger.warn("SENDING ANOMALY ALERT", anomaly: anomaly_data)
+    Logger.warning("SENDING ANOMALY ALERT", anomaly: anomaly_data)
     
     # Example email integration:
     # Email.send_alert("devops@company.com", %{

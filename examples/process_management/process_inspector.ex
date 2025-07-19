@@ -14,15 +14,16 @@ defmodule Examples.ProcessManagement.ProcessInspector do
   Get a comprehensive analysis of all processes in the system.
   """
   def analyze_all_processes do
-    case Arsenal.Operations.ListProcesses.execute(%{limit: 10000}) do
-      {:ok, processes} ->
+    case Arsenal.Operations.ListProcesses.execute(%{limit: 10000, sort_by: :memory}) do
+      {:ok, result} ->
+        processes = result.processes
         analysis = %{
           summary: generate_process_summary(processes),
           categorization: categorize_processes(processes),
           memory_analysis: analyze_memory_usage(processes),
           performance_analysis: analyze_performance(processes),
-          relationships: map_process_relationships(processes),
-          outliers: detect_outliers(processes),
+          relationships: %{note: "Relationship analysis requires detailed process info"},
+          outliers: detect_basic_outliers(processes),
           recommendations: generate_recommendations(processes)
         }
         
@@ -67,8 +68,9 @@ defmodule Examples.ProcessManagement.ProcessInspector do
   Find processes matching specific criteria.
   """
   def find_processes(criteria) do
-    case Arsenal.Operations.ListProcesses.execute(%{limit: 10000}) do
-      {:ok, processes} ->
+    case Arsenal.Operations.ListProcesses.execute(%{limit: 10000, sort_by: :memory}) do
+      {:ok, result} ->
+        processes = result.processes
         matches = Enum.filter(processes, &matches_criteria?(&1, criteria))
         
         {:ok, %{
@@ -102,8 +104,9 @@ defmodule Examples.ProcessManagement.ProcessInspector do
   Generate a process tree visualization.
   """
   def generate_process_tree(root_pid \\ nil) do
-    case Arsenal.Operations.ListProcesses.execute(%{limit: 10000}) do
-      {:ok, processes} ->
+    case Arsenal.Operations.ListProcesses.execute(%{limit: 10000, sort_by: :memory}) do
+      {:ok, result} ->
+        processes = result.processes
         tree = build_process_tree(processes, root_pid)
         {:ok, tree}
       
@@ -119,15 +122,15 @@ defmodule Examples.ProcessManagement.ProcessInspector do
     
     %{
       total_processes: total,
-      alive_processes: Enum.count(processes, & &1.status == :running),
-      waiting_processes: Enum.count(processes, & &1.status == :waiting),
-      suspended_processes: Enum.count(processes, & &1.status == :suspended),
+      alive_processes: total, # All listed processes are alive
+      waiting_processes: 0, # Not available in basic info
+      suspended_processes: 0, # Not available in basic info
       total_memory_mb: div(Enum.sum(Enum.map(processes, & &1.memory)), 1024 * 1024),
-      average_memory_kb: div(Enum.sum(Enum.map(processes, & &1.memory)), total * 1024),
+      average_memory_kb: if(total > 0, do: div(Enum.sum(Enum.map(processes, & &1.memory)), total * 1024), else: 0),
       total_reductions: Enum.sum(Enum.map(processes, & &1.reductions)),
-      processes_with_names: Enum.count(processes, & &1.registered_name != nil),
-      processes_with_links: Enum.count(processes, &(length(&1.links) > 0)),
-      processes_with_monitors: Enum.count(processes, &(length(&1.monitors) > 0))
+      processes_with_names: 0, # Not available in basic info
+      processes_with_links: 0, # Not available in basic info
+      processes_with_monitors: 0 # Not available in basic info
     }
   end
   
@@ -146,24 +149,17 @@ defmodule Examples.ProcessManagement.ProcessInspector do
   end
   
   defp categorize_process(process) do
+    # Categorize based on available information
+    # Since we only have basic info, we'll use simple heuristics
     cond do
-      process.registered_name && String.contains?(to_string(process.registered_name), "Supervisor") ->
-        :supervisor
+      process.memory > 1_000_000 -> # >1MB processes are likely important
+        :high_memory_process
       
-      process.initial_call && match?({GenServer, _, _}, process.initial_call) ->
-        :genserver
+      process.reductions > 100_000 -> # High activity processes
+        :active_process
       
-      process.initial_call && match?({Task, _, _}, process.initial_call) ->
-        :task
-      
-      process.initial_call && match?({Agent, _, _}, process.initial_call) ->
-        :agent
-      
-      process.registered_name ->
-        :named_process
-      
-      length(process.links) > 0 ->
-        :linked_process
+      process.message_queue_len > 0 -> # Processes with queued messages
+        :queued_process
       
       true ->
         :worker_process
@@ -187,7 +183,7 @@ defmodule Examples.ProcessManagement.ProcessInspector do
   
   defp analyze_performance(processes) do
     reductions = Enum.map(processes, & &1.reductions)
-    queue_lengths = Enum.map(processes, & &1.message_queue_length)
+    queue_lengths = Enum.map(processes, & &1.message_queue_len)
     
     %{
       total_reductions: Enum.sum(reductions),
@@ -202,53 +198,25 @@ defmodule Examples.ProcessManagement.ProcessInspector do
     }
   end
   
-  defp map_process_relationships(processes) do
-    # Build a map of process relationships
-    process_map = Enum.into(processes, %{}, &{&1.pid, &1})
-    
-    relationships = Enum.map(processes, fn process ->
-      %{
-        pid: process.pid,
-        links: process.links,
-        monitors: process.monitors,
-        monitored_by: process.monitored_by,
-        parent: find_parent_process(process, process_map),
-        children: find_child_processes(process, processes)
-      }
-    end)
-    
-    %{
-      total_links: Enum.sum(Enum.map(processes, &length(&1.links))),
-      total_monitors: Enum.sum(Enum.map(processes, &length(&1.monitors))),
-      orphaned_processes: Enum.count(relationships, &(is_nil(&1.parent) && length(&1.links) == 0)),
-      highly_connected: Enum.filter(relationships, &(length(&1.links) + length(&1.monitors) > 5)),
-      process_relationships: relationships
-    }
-  end
   
-  defp detect_outliers(processes) do
-    memory_threshold = calculate_memory_threshold(processes)
-    reduction_threshold = calculate_reduction_threshold(processes)
-    queue_threshold = 100
+  defp detect_basic_outliers(processes) do
+    # Simplified outlier detection using available fields
+    memory_values = Enum.map(processes, & &1.memory)
+    avg_memory = Enum.sum(memory_values) / length(memory_values)
     
-    outliers = Enum.filter(processes, fn process ->
-      process.memory > memory_threshold ||
-      process.reductions > reduction_threshold ||
-      process.message_queue_length > queue_threshold
-    end)
+    high_memory = Enum.filter(processes, & &1.memory > avg_memory * 3)
+    high_reductions = Enum.filter(processes, & &1.reductions > 1_000_000)
+    with_queues = Enum.filter(processes, & &1.message_queue_len > 0)
     
     %{
-      memory_outliers: Enum.filter(outliers, &(&1.memory > memory_threshold)),
-      performance_outliers: Enum.filter(outliers, &(&1.reductions > reduction_threshold)),
-      queue_outliers: Enum.filter(outliers, &(&1.message_queue_length > queue_threshold)),
-      total_outliers: length(outliers),
-      thresholds: %{
-        memory_mb: div(memory_threshold, 1024 * 1024),
-        reductions: reduction_threshold,
-        queue_length: queue_threshold
-      }
+      high_memory_processes: length(high_memory),
+      high_cpu_processes: length(high_reductions), 
+      processes_with_queues: length(with_queues),
+      memory_outliers: Enum.take(high_memory, 5),
+      cpu_outliers: Enum.take(high_reductions, 5)
     }
   end
+
   
   defp generate_recommendations(processes) do
     recommendations = []
@@ -262,7 +230,7 @@ defmodule Examples.ProcessManagement.ProcessInspector do
     end
     
     # Check for long message queues
-    long_queue_count = Enum.count(processes, &(&1.message_queue_length > 100))
+    long_queue_count = Enum.count(processes, &(&1.message_queue_len > 100))
     recommendations = if long_queue_count > 0 do
       ["#{long_queue_count} processes with long message queues - check for bottlenecks" | recommendations]
     else
@@ -277,13 +245,7 @@ defmodule Examples.ProcessManagement.ProcessInspector do
       recommendations
     end
     
-    # Check for orphaned processes
-    orphaned_count = Enum.count(processes, &(length(&1.links) == 0 && &1.registered_name == nil))
-    recommendations = if orphaned_count > 100 do
-      ["#{orphaned_count} orphaned processes detected - review process lifecycle" | recommendations]
-    else
-      recommendations
-    end
+    # Note: Cannot check for orphaned processes without links information
     
     if length(recommendations) == 0 do
       ["System appears healthy - no immediate recommendations"]
@@ -391,8 +353,9 @@ defmodule Examples.ProcessManagement.ProcessInspector do
     end
     
     # Message queue recommendations
-    recommendations = if process_info.message_queue_length > 1000 do
-      ["Very long message queue (#{process_info.message_queue_length}) - check for processing bottlenecks" | recommendations]
+    queue_len = Map.get(process_info, :message_queue_len, 0)
+    recommendations = if queue_len > 1000 do
+      ["Very long message queue (#{queue_len}) - check for processing bottlenecks" | recommendations]
     else
       recommendations
     end
@@ -405,7 +368,8 @@ defmodule Examples.ProcessManagement.ProcessInspector do
     end
     
     # Status recommendations
-    recommendations = if process_info.status == :suspended do
+    status = Map.get(process_info, :status, :running)
+    recommendations = if status == :suspended do
       ["Process is suspended - check for deadlocks or debugging sessions" | recommendations]
     else
       recommendations
@@ -423,28 +387,23 @@ defmodule Examples.ProcessManagement.ProcessInspector do
       case key do
         :memory_greater_than -> process.memory > value
         :memory_less_than -> process.memory < value
-        :queue_length_greater_than -> process.message_queue_length > value
+        :queue_length_greater_than -> process.message_queue_len > value
         :reductions_greater_than -> process.reductions > value
-        :status -> process.status == value
-        :has_name -> (process.registered_name != nil) == value
-        :initial_call_contains -> 
-          process.initial_call && 
-          String.contains?(inspect(process.initial_call), to_string(value))
-        :link_count_greater_than -> length(process.links) > value
+        # Note: status, registered_name, initial_call, and links not available in basic process info
         _ -> true
       end
     end)
   end
   
   defp get_process_snapshot do
-    case Arsenal.Operations.ListProcesses.execute(%{limit: 10000}) do
-      {:ok, processes} ->
+    case Arsenal.Operations.ListProcesses.execute(%{limit: 10000, sort_by: :memory}) do
+      {:ok, result} ->
+        processes = result.processes
         Enum.into(processes, %{}, fn process ->
           {process.pid, %{
-            registered_name: process.registered_name,
-            initial_call: process.initial_call,
             memory: process.memory,
-            reductions: process.reductions
+            reductions: process.reductions,
+            message_queue_len: process.message_queue_len
           }}
         end)
       
@@ -489,22 +448,19 @@ defmodule Examples.ProcessManagement.ProcessInspector do
     end
   end
   
-  defp build_subtree(pid, process_map, all_processes) do
+  defp build_subtree(pid, process_map, _all_processes) do
     case Map.get(process_map, pid) do
       nil ->
         %{pid: pid, info: "Process not found", children: []}
       
       process ->
-        children = find_child_processes(process, all_processes)
-        child_trees = Enum.map(children, &build_subtree(&1.pid, process_map, all_processes))
-        
+        # Note: Cannot build real process tree without link information
         %{
           pid: process.pid,
-          name: process.registered_name,
-          initial_call: process.initial_call,
           memory_mb: div(process.memory, 1024 * 1024),
-          status: process.status,
-          children: child_trees
+          reductions: process.reductions,
+          queue_length: process.message_queue_len,
+          children: [] # Cannot determine children without link info
         }
     end
   end
@@ -514,9 +470,9 @@ defmodule Examples.ProcessManagement.ProcessInspector do
   defp format_process_summary(process) do
     %{
       pid: inspect(process.pid),
-      name: process.registered_name,
+      name: Map.get(process, :registered_name, "unnamed"),
       memory_kb: div(process.memory, 1024),
-      queue_length: process.message_queue_length
+      queue_length: Map.get(process, :message_queue_len, 0)
     }
   end
   
@@ -546,39 +502,14 @@ defmodule Examples.ProcessManagement.ProcessInspector do
     |> Enum.map(&format_process_summary/1)
   end
   
-  defp find_parent_process(process, process_map) do
-    # This is simplified - in practice you'd need to check supervision relationships
-    case process.links do
-      [] -> nil
-      [parent_pid | _] -> Map.get(process_map, parent_pid)
-    end
+  
+  
+  defp is_top_level_process?(_process, _all_processes) do
+    # Cannot determine hierarchy without link information
+    true
   end
   
-  defp find_child_processes(process, all_processes) do
-    # Find processes that link to this one
-    Enum.filter(all_processes, fn other ->
-      process.pid in other.links
-    end)
-  end
   
-  defp is_top_level_process?(process, all_processes) do
-    # Check if this process has any parent in the supervision tree
-    not Enum.any?(all_processes, fn other ->
-      process.pid in other.links && other.pid != process.pid
-    end)
-  end
-  
-  defp calculate_memory_threshold(processes) do
-    memory_values = Enum.map(processes, & &1.memory)
-    average = div(Enum.sum(memory_values), length(memory_values))
-    average * 10  # 10x average as threshold
-  end
-  
-  defp calculate_reduction_threshold(processes) do
-    reduction_values = Enum.map(processes, & &1.reductions)
-    average = div(Enum.sum(reduction_values), length(reduction_values))
-    average * 5  # 5x average as threshold
-  end
   
   defp analyze_message_types(messages) do
     messages

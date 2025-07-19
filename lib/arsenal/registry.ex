@@ -164,8 +164,8 @@ defmodule Arsenal.Registry do
 
   def handle_call({:execute_operation, name, params, context}, _from, state) do
     with {:ok, info} <- get_operation_info(name),
-         {:ok, validated_params} <- info.module.validate_params(params),
-         :ok <- info.module.authorize(validated_params, context) do
+         {:ok, validated_params} <- safe_validate_params(info.module, params),
+         :ok <- safe_authorize(info.module, validated_params, context) do
       start_time = System.monotonic_time()
       result = info.module.execute(validated_params)
       duration = System.monotonic_time() - start_time
@@ -177,7 +177,7 @@ defmodule Arsenal.Registry do
           category: info.category
         })
 
-      info.module.emit_telemetry(result, metadata)
+      safe_emit_telemetry(info.module, result, metadata)
 
       {:reply, result, state}
     else
@@ -266,5 +266,37 @@ defmodule Arsenal.Registry do
         function_exported?(module, :name, 0) and
         function_exported?(module, :execute, 1)
     end)
+  end
+
+  defp safe_validate_params(module, params) do
+    if function_exported?(module, :validate_params, 1) do
+      module.validate_params(params)
+    else
+      {:ok, params}
+    end
+  rescue
+    error -> {:error, error}
+  end
+
+  defp safe_authorize(module, params, context) do
+    if function_exported?(module, :authorize, 2) do
+      module.authorize(params, context)
+    else
+      :ok
+    end
+  rescue
+    error -> {:error, error}
+  end
+
+  defp safe_emit_telemetry(module, result, metadata) do
+    if function_exported?(module, :emit_telemetry, 2) do
+      module.emit_telemetry(result, metadata)
+    else
+      :ok
+    end
+  rescue
+    error ->
+      Logger.warning("Failed to emit telemetry", error: error, module: module)
+      :ok
   end
 end

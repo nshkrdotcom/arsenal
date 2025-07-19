@@ -22,7 +22,7 @@ defmodule Arsenal do
          ensure_other_ets_tables()
          # Give registry time to start
          Process.sleep(100)
-         Arsenal.Startup.register_all_operations()
+         safe_register_all_operations()
        end}
     ]
 
@@ -34,7 +34,12 @@ defmodule Arsenal do
   Get all available arsenal operations with their configurations.
   """
   def list_operations do
-    Arsenal.Registry.list_operations()
+    if Code.ensure_loaded?(Arsenal.Registry) and
+         function_exported?(Arsenal.Registry, :list_operations, 0) do
+      apply(Arsenal.Registry, :list_operations, [])
+    else
+      []
+    end
   end
 
   @doc """
@@ -53,14 +58,24 @@ defmodule Arsenal do
   Get operation configuration for a specific module.
   """
   def get_operation_config(operation_module) do
-    Arsenal.Registry.get_operation(operation_module)
+    if Code.ensure_loaded?(Arsenal.Registry) and
+         function_exported?(Arsenal.Registry, :get_operation, 1) do
+      apply(Arsenal.Registry, :get_operation, [operation_module])
+    else
+      {:error, :registry_not_available}
+    end
   end
 
   @doc """
   Register a new operation module dynamically.
   """
   def register_operation(operation_module) do
-    Arsenal.Registry.register_operation(operation_module)
+    if Code.ensure_loaded?(Arsenal.Registry) and
+         function_exported?(Arsenal.Registry, :register_operation, 1) do
+      apply(Arsenal.Registry, :register_operation, [operation_module])
+    else
+      {:error, :registry_not_available}
+    end
   end
 
   @doc """
@@ -88,6 +103,18 @@ defmodule Arsenal do
       operation_module.validate_params(params)
     else
       {:ok, params}
+    end
+  end
+
+  defp safe_register_all_operations do
+    if Code.ensure_loaded?(Arsenal.Startup) and
+         function_exported?(Arsenal.Startup, :register_all_operations, 0) do
+      apply(Arsenal.Startup, :register_all_operations, [])
+    else
+      # Fallback: register built-in operations manually if Startup module isn't available
+      require Logger
+      Logger.info("Arsenal.Startup not available, skipping automatic operation registration")
+      :ok
     end
   end
 

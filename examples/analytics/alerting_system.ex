@@ -295,7 +295,7 @@ defmodule Examples.Analytics.AlertingSystem do
       # Send notifications
       send_initial_notifications(alert, rule, state.notification_channels)
       
-      Logger.warn("Alert triggered", 
+      Logger.warning("Alert triggered", 
         alert_id: alert.id,
         type: alert.type,
         severity: alert.severity,
@@ -347,9 +347,9 @@ defmodule Examples.Analytics.AlertingSystem do
   end
   
   defp should_escalate_alert?(alert, now, policies) do
-    return alert.acknowledged_at == nil &&
-           alert.resolved_at == nil &&
-           should_escalate_based_on_policy?(alert, now, policies)
+    alert.acknowledged_at == nil &&
+      alert.resolved_at == nil &&
+      should_escalate_based_on_policy?(alert, now, policies)
   end
   
   defp should_escalate_based_on_policy?(alert, now, policies) do
@@ -369,7 +369,7 @@ defmodule Examples.Analytics.AlertingSystem do
     policy = get_escalation_policy(alert.severity, policies)
     level = Enum.at(policy.levels, alert.escalation_level)
     
-    Logger.warn("Escalating alert", 
+    Logger.warning("Escalating alert", 
       alert_id: alert.id,
       level: alert.escalation_level + 1,
       channels: level.channels
@@ -402,7 +402,7 @@ defmodule Examples.Analytics.AlertingSystem do
   defp send_notification(channel, alert, notification_channels) do
     case Map.get(notification_channels, channel) do
       nil ->
-        Logger.warn("Unknown notification channel: #{channel}")
+        Logger.warning("Unknown notification channel: #{channel}")
       
       channel_config ->
         send_to_channel(channel, alert, channel_config)
@@ -410,7 +410,7 @@ defmodule Examples.Analytics.AlertingSystem do
   end
   
   defp send_to_channel(:console, alert, _config) do
-    Logger.warn("ALERT: #{alert.title}", alert: alert)
+    Logger.warning("ALERT: #{alert.title}", alert: alert)
   end
   
   defp send_to_channel(:slack, alert, config) do
@@ -447,7 +447,7 @@ defmodule Examples.Analytics.AlertingSystem do
   end
   
   defp send_to_channel(channel, alert, config) do
-    Logger.warn("Unknown notification channel type: #{channel}")
+    Logger.warning("Unknown notification channel type: #{channel}")
   end
   
   # Configuration and defaults

@@ -178,13 +178,18 @@ defmodule Arsenal.Operations.ListSupervisors do
       pid = Process.whereis(name)
 
       if pid && Process.alive?(pid) do
-        case Process.info(pid, :dictionary) do
-          {_, dict} ->
-            Enum.any?(dict, fn {key, _} ->
-              key == :"$initial_call" or
-                key == :"$ancestors" or
-                (is_atom(key) && Atom.to_string(key) =~ "supervisor")
-            end)
+        # Try to get supervisor state - if this succeeds, it's likely a supervisor
+        case :sys.get_state(pid, 1000) do
+          %{strategy: _strategy} ->
+            # Additional check: try to call which_children
+            try do
+              Supervisor.which_children(pid)
+              true
+            rescue
+              _ -> false
+            catch
+              :exit, _ -> false
+            end
 
           _ ->
             false
@@ -194,6 +199,8 @@ defmodule Arsenal.Operations.ListSupervisors do
       end
     rescue
       _ -> false
+    catch
+      :exit, _ -> false
     end
   end
 
@@ -204,16 +211,27 @@ defmodule Arsenal.Operations.ListSupervisors do
       if pid && Process.alive?(pid) do
         children =
           try do
-            Supervisor.which_children(pid)
+            # Only call which_children if this is actually a supervisor
+            case :sys.get_state(pid, 1000) do
+              %{} = _supervisor_state ->
+                Supervisor.which_children(pid)
+
+              _ ->
+                []
+            end
           rescue
             _ -> []
+          catch
+            :exit, _ -> []
           end
 
         %{
           name: name,
-          pid: inspect(pid),
+          pid: pid,
           alive: true,
           child_count: length(children),
+          # Add alias for compatibility
+          children_count: length(children),
           application: get_process_application_from_name(name)
         }
       else
@@ -256,7 +274,22 @@ defmodule Arsenal.Operations.ListSupervisors do
     end)
   end
 
-  defp get_supervisor_children(pid) do
+  defp get_supervisor_children(pid_string) when is_binary(pid_string) do
+    try do
+      pid = String.to_existing_atom(pid_string)
+      pid = Process.whereis(pid)
+      get_supervisor_children(pid)
+    rescue
+      _ ->
+        %{
+          child_count: 0,
+          strategy: :unknown,
+          children: []
+        }
+    end
+  end
+
+  defp get_supervisor_children(pid) when is_pid(pid) do
     try do
       children = Supervisor.which_children(pid)
       strategy = get_supervisor_strategy(pid)
@@ -273,8 +306,17 @@ defmodule Arsenal.Operations.ListSupervisors do
           strategy: :unknown,
           children: []
         }
+    catch
+      :exit, _ ->
+        %{
+          child_count: 0,
+          strategy: :unknown,
+          children: []
+        }
     end
   end
+
+  defp get_supervisor_children(_), do: %{child_count: 0, strategy: :unknown, children: []}
 
   defp get_supervisor_strategy(pid) do
     try do

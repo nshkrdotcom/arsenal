@@ -34,11 +34,20 @@ defmodule Arsenal.Startup do
 
   defp discover_operation_modules do
     # Ensure all Arsenal.Operations modules are loaded
-    {:ok, modules} = :application.get_key(:arsenal, :modules)
+    case :application.get_key(:arsenal, :modules) do
+      {:ok, modules} ->
+        modules
 
-    modules
+      :undefined ->
+        # Fallback when running as standalone script
+        :code.all_loaded()
+        |> Enum.map(fn {module, _} -> module end)
+        |> Enum.filter(fn module ->
+          String.starts_with?(to_string(module), "Elixir.Arsenal.Operations.")
+        end)
+    end
     |> Enum.filter(fn module ->
-      # Check if it's an Arsenal operation module
+      # Check if it's an Arsenal operation module (additional filter for :ok case)
       module_str = to_string(module)
 
       String.starts_with?(module_str, "Elixir.Arsenal.Operations.") and

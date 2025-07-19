@@ -42,6 +42,58 @@ Arsenal is a powerful metaprogramming framework that transforms Elixir modules i
 - **Distributed System Support**: Built-in operations for cluster management (when available)
 - **Process Management**: Comprehensive process inspection, tracing, and control operations
 
+## 🚀 Quick Start
+
+### Try Arsenal with Standalone Examples
+
+Experience Arsenal's capabilities immediately with our executable demo scripts:
+
+```bash
+# Clone the repository
+git clone https://github.com/nshkrdotcom/arsenal.git
+cd arsenal
+
+# Run all examples
+elixir examples/run_all_demos.exs
+
+# Or try individual demos
+elixir examples/run_basic_operations.exs    # Basic operations and CRUD
+elixir examples/run_analytics_demo.exs      # System monitoring and analytics  
+elixir examples/run_process_demo.exs        # Process management and inspection
+```
+
+**What you'll see:**
+- ✅ Mathematical operations with validation (factorial calculations)
+- ✅ User CRUD operations with database simulation
+- ✅ Real-time system health and performance monitoring
+- ✅ Process analysis, categorization, and management
+- ✅ Error handling and validation demonstrations
+
+Each demo is **self-contained** and requires no setup - just run and explore!
+
+### Add to Your Project
+
+```elixir
+# In mix.exs
+defp deps do
+  [
+    {:arsenal, "~> 0.1.0"}
+  ]
+end
+
+# In your application.ex
+def start(_type, _args) do
+  children = [
+    {Arsenal, []},
+    # ... your other children
+  ]
+  
+  Supervisor.start_link(children, strategy: :one_for_one)
+end
+```
+
+See the [`examples/`](examples/) directory for comprehensive integration examples.
+
 ## Architecture
 
 ```mermaid

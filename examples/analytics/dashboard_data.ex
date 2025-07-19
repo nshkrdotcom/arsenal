@@ -81,7 +81,7 @@ defmodule Examples.Analytics.DashboardData do
   """
   def get_supervisor_health do
     case Arsenal.Operations.ListSupervisors.execute(%{}) do
-      {:ok, supervisors} ->
+      {:ok, {supervisors, _meta}} ->
         supervisor_health = Enum.map(supervisors, fn supervisor ->
           restart_stats = case Arsenal.AnalyticsServer.get_restart_statistics(supervisor.pid) do
             {:ok, stats} -> stats
@@ -233,7 +233,7 @@ defmodule Examples.Analytics.DashboardData do
   defp get_restart_metrics do
     # This would aggregate restart data across all supervisors
     case Arsenal.Operations.ListSupervisors.execute(%{}) do
-      {:ok, supervisors} ->
+      {:ok, {supervisors, _meta}} ->
         restart_data = Enum.map(supervisors, fn supervisor ->
           case Arsenal.AnalyticsServer.get_restart_statistics(supervisor.pid) do
             {:ok, stats} ->
@@ -316,7 +316,7 @@ defmodule Examples.Analytics.DashboardData do
     }
   end
   
-  defp format_historical_metrics(history) do
+  defp format_historical_metrics(_history) do
     # Format historical data for charting
     # This would process the historical data structure
     %{
@@ -327,7 +327,7 @@ defmodule Examples.Analytics.DashboardData do
     }
   end
   
-  defp format_historical_restarts(history) do
+  defp format_historical_restarts(_history) do
     # Format restart events for timeline display
     []
   end

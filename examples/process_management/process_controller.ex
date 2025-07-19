@@ -199,10 +199,10 @@ defmodule Examples.ProcessManagement.ProcessController do
     case Examples.ProcessManagement.ProcessInspector.find_processes(criteria) do
       {:ok, %{matches: resource_hogs}} ->
         kill_results = Enum.map(resource_hogs, fn process ->
-          Logger.warn("Killing resource hog process", 
+          Logger.warning("Killing resource hog process", 
             pid: process.pid,
             memory_mb: div(process.memory, 1024 * 1024),
-            queue_length: process.message_queue_length,
+            queue_length: process.message_queue_len,
             reductions: process.reductions
           )
           
@@ -230,13 +230,12 @@ defmodule Examples.ProcessManagement.ProcessController do
   
   @impl true
   def handle_call(:get_stats, _from, state) do
-    current_stats = %{
-      state.stats |
+    current_stats = Map.merge(state.stats, %{
       managed_processes_count: map_size(state.managed_processes),
       active_policies_count: Enum.count(state.policies, & &1.enabled),
       last_health_check: state.last_health_check,
       uptime_seconds: get_uptime_seconds()
-    }
+    })
     
     {:reply, current_stats, state}
   end
@@ -296,27 +295,41 @@ defmodule Examples.ProcessManagement.ProcessController do
   end
   
   defp stop_single_process(pid, timeout) do
-    case Arsenal.Operations.KillProcess.execute(%{pid: pid, reason: :normal, timeout: timeout}) do
-      {:ok, _} -> :ok
-      error -> error
+    if Code.ensure_loaded?(Arsenal.Operations.KillProcess) and 
+       function_exported?(Arsenal.Operations.KillProcess, :execute, 1) do
+      case apply(Arsenal.Operations.KillProcess, :execute, [%{pid: pid, reason: :normal, timeout: timeout}]) do
+        {:ok, _} -> :ok
+        error -> error
+      end
+    else
+      # Fallback: use direct Process.exit
+      try do
+        Process.exit(pid, :normal)
+        :ok
+      rescue
+        _ -> {:error, :kill_failed}
+      end
     end
   end
   
   defp restart_single_process(pid) do
     # First try to get process info to understand what to restart
     case Arsenal.Operations.GetProcessInfo.execute(%{pid: pid}) do
-      {:ok, process_info} ->
+      {:ok, _process_info} ->
         # Try graceful restart first
-        case Arsenal.Operations.RestartProcess.execute(%{pid: pid}) do
-          {:ok, result} ->
-            {:ok, result}
-          
-          {:error, _} ->
-            # If restart fails, try kill and let supervisor restart
-            case Arsenal.Operations.KillProcess.execute(%{pid: pid, reason: :restart}) do
-              {:ok, _} -> {:ok, %{pid: pid, action: :killed_for_restart}}
-              error -> error
-            end
+        if Code.ensure_loaded?(Arsenal.Operations.RestartProcess) and
+           function_exported?(Arsenal.Operations.RestartProcess, :execute, 1) do
+          case apply(Arsenal.Operations.RestartProcess, :execute, [%{pid: pid}]) do
+            {:ok, result} ->
+              {:ok, result}
+            
+            {:error, _} ->
+              # If restart fails, try kill and let supervisor restart
+              kill_single_process(pid, :restart)
+          end
+        else
+          # Fallback: use kill_single_process
+          kill_single_process(pid, :restart)
         end
       
       error ->
@@ -325,7 +338,18 @@ defmodule Examples.ProcessManagement.ProcessController do
   end
   
   defp kill_single_process(pid, reason) do
-    Arsenal.Operations.KillProcess.execute(%{pid: pid, reason: reason})
+    if Code.ensure_loaded?(Arsenal.Operations.KillProcess) and
+       function_exported?(Arsenal.Operations.KillProcess, :execute, 1) do
+      apply(Arsenal.Operations.KillProcess, :execute, [%{pid: pid, reason: reason}])
+    else
+      # Fallback: use direct Process.exit
+      try do
+        Process.exit(pid, reason)
+        {:ok, %{pid: pid, action: :killed, reason: reason}}
+      rescue
+        _ -> {:error, :kill_failed}
+      end
+    end
   end
   
   defp validate_process_spec(spec) do
@@ -357,7 +381,7 @@ defmodule Examples.ProcessManagement.ProcessController do
         %{
           status: health_status,
           memory_mb: div(process_info.memory, 1024 * 1024),
-          queue_length: process_info.message_queue_length,
+          queue_length: Map.get(process_info, :message_queue_len, 0),
           reductions: process_info.reductions,
           uptime_seconds: calculate_uptime(process_data.started_at),
           restart_count: process_data.restarts
@@ -374,13 +398,13 @@ defmodule Examples.ProcessManagement.ProcessController do
   
   defp assess_process_health(process_info, _process_data) do
     cond do
-      process_info.status != :running ->
+      Map.get(process_info, :status, :running) != :running ->
         :unhealthy
       
       process_info.memory > 100 * 1024 * 1024 ->  # >100MB
         :memory_warning
       
-      process_info.message_queue_length > 10000 ->
+      Map.get(process_info, :message_queue_len, 0) > 10000 ->
         :queue_warning
       
       process_info.reductions > 1_000_000_000 ->  # Very high CPU
@@ -405,13 +429,13 @@ defmodule Examples.ProcessManagement.ProcessController do
     case health_result.status do
       :dead ->
         # Remove from managed processes
-        Logger.warn("Removing dead process from management", pid: pid)
+        Logger.warning("Removing dead process from management", pid: pid)
         managed_processes = Map.delete(state.managed_processes, pid)
         stats = update_stats(state.stats, :dead_processes_detected, 1)
         %{state | managed_processes: managed_processes, stats: stats}
       
       :memory_warning ->
-        Logger.warn("Process memory warning", 
+        Logger.warning("Process memory warning", 
           pid: pid, 
           memory_mb: health_result.memory_mb
         )
@@ -419,7 +443,7 @@ defmodule Examples.ProcessManagement.ProcessController do
         state
       
       :queue_warning ->
-        Logger.warn("Process queue warning", 
+        Logger.warning("Process queue warning", 
           pid: pid, 
           queue_length: health_result.queue_length
         )
@@ -427,7 +451,7 @@ defmodule Examples.ProcessManagement.ProcessController do
         state
       
       :cpu_warning ->
-        Logger.warn("Process CPU warning", 
+        Logger.warning("Process CPU warning", 
           pid: pid, 
           reductions: health_result.reductions
         )
