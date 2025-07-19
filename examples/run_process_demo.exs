@@ -284,15 +284,14 @@ defmodule ProcessDemo do
   
   defp demo_supervisor_analysis do
     case Arsenal.Registry.execute_operation(:list_supervisors, %{}) do
-      {:ok, supervisors} ->
-        IO.puts("   Found #{length(supervisors)} supervisors:")
+      {:ok, {supervisors, meta}} ->
+        IO.puts("   Found #{length(supervisors)} supervisors (total: #{meta.total}):")
         
         Enum.take(supervisors, 5) |> Enum.each(fn supervisor ->
-          name = supervisor.name || "unnamed"
+          name = Map.get(supervisor, :name, "unnamed")
           IO.puts("     #{name} (#{inspect(supervisor.pid)}):")
-          IO.puts("       Strategy: #{supervisor.strategy}")
-          IO.puts("       Children: #{supervisor.children_count}")
-          IO.puts("       Max Restarts: #{supervisor.max_restarts} in #{supervisor.max_seconds}s")
+          IO.puts("       Strategy: #{Map.get(supervisor, :strategy, :unknown)}")
+          IO.puts("       Children: #{Map.get(supervisor, :children_count, 0)}")
         end)
         
         if length(supervisors) > 5 do
@@ -302,7 +301,8 @@ defmodule ProcessDemo do
         # Try to get restart statistics for the first supervisor
         if length(supervisors) > 0 do
           first_sup = hd(supervisors)
-          IO.puts("\n   Restart statistics for #{first_sup.name || "first supervisor"}:")
+          name = Map.get(first_sup, :name, "first supervisor")
+          IO.puts("\n   Restart statistics for #{name}:")
           
           case Arsenal.AnalyticsServer.get_restart_statistics(first_sup.pid) do
             {:ok, stats} ->

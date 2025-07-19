@@ -327,11 +327,13 @@ defmodule Arsenal.AnalyticsServerIntegrationTest do
               :crypto.strong_rand_bytes(10)
             end
 
-            # Wait for signal to stop
+            # Ensure the process stays alive long enough to be measured
+            # Wait for signal to stop, but with longer timeout to guarantee
+            # the process is alive during metrics collection
             receive do
               :stop -> :ok
             after
-              2000 -> :timeout
+              15_000 -> :timeout
             end
           end)
         end

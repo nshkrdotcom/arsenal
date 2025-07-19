@@ -166,86 +166,101 @@ defmodule Arsenal.Operations.ListSupervisors do
   end
 
   defp discover_supervisors do
-    # Get all registered processes and filter for supervisors
-    Process.registered()
-    |> Enum.filter(&is_supervisor?/1)
-    |> Enum.map(&supervisor_info/1)
+    Process.list()
+    |> Enum.map(&build_supervisor_info_safely/1)
+    # Filter out non-supervisors and processes that failed checks
     |> Enum.filter(&(&1 != nil))
   end
 
-  defp is_supervisor?(name) do
-    try do
-      pid = Process.whereis(name)
+  defp build_supervisor_info_safely(pid) do
+    # Multiple cheap checks before attempting supervisor calls
+    with {:trap_exit, true} <- Process.info(pid, :trap_exit),
+         {:initial_call, initial_call} <- Process.info(pid, :initial_call),
+         true <- looks_like_supervisor?(initial_call) do
+      # The process traps exits and has supervisor-like initial call
+      # Now perform the potentially blocking supervisor check safely
+      details = get_supervisor_details_safely(pid)
 
-      if pid && Process.alive?(pid) do
-        # Try to get supervisor state - if this succeeds, it's likely a supervisor
-        case :sys.get_state(pid, 1000) do
-          %{strategy: _strategy} ->
-            # Additional check: try to call which_children
-            try do
-              Supervisor.which_children(pid)
-              true
-            rescue
-              _ -> false
-            catch
-              :exit, _ -> false
-            end
-
-          _ ->
-            false
-        end
-      else
-        false
-      end
-    rescue
-      _ -> false
-    catch
-      :exit, _ -> false
-    end
-  end
-
-  defp supervisor_info(name) do
-    try do
-      pid = Process.whereis(name)
-
-      if pid && Process.alive?(pid) do
-        children =
-          try do
-            # Only call which_children if this is actually a supervisor
-            case :sys.get_state(pid, 1000) do
-              %{} = _supervisor_state ->
-                Supervisor.which_children(pid)
-
-              _ ->
-                []
-            end
-          rescue
-            _ -> []
-          catch
-            :exit, _ -> []
-          end
-
+      if details.is_supervisor do
         %{
-          name: name,
+          name: get_process_name(pid),
           pid: pid,
           alive: true,
-          child_count: length(children),
-          # Add alias for compatibility
-          children_count: length(children),
-          application: get_process_application_from_name(name)
+          child_count: details.child_count,
+          # Alias for compatibility
+          children_count: details.child_count,
+          strategy: details.strategy,
+          application: get_process_application_from_pid(pid)
         }
       else
+        # Not a supervisor
         nil
       end
-    rescue
+    else
+      # Failed basic checks, not a supervisor
       _ -> nil
+    end
+  rescue
+    # In case Process.info fails (e.g., process died mid-check)
+    ArgumentError -> nil
+  end
+
+  # Check if the initial call looks like a supervisor
+  defp looks_like_supervisor?({:supervisor, _, _}), do: true
+
+  defp looks_like_supervisor?({module, _, _}) do
+    # Check if module name contains "Supervisor" or "Sup"
+    module_string = to_string(module)
+
+    String.contains?(module_string, "Supervisor") or
+      String.contains?(module_string, "Sup") or
+      String.ends_with?(module_string, ".Supervisor")
+  end
+
+  defp looks_like_supervisor?(_), do: false
+
+  defp get_supervisor_details_safely(pid) do
+    # This task isolates the potentially blocking call in a separate process.
+    task =
+      Task.async(fn ->
+        try do
+          # Supervisor.which_children/1 is a reliable check. If it succeeds, it's a supervisor.
+          children = Supervisor.which_children(pid)
+
+          # If that works, also try to get the strategy.
+          strategy =
+            case :sys.get_state(pid) do
+              %{strategy: s} -> s
+              _ -> :unknown
+            end
+
+          %{is_supervisor: true, child_count: length(children), strategy: strategy}
+        rescue
+          _ -> %{is_supervisor: false}
+        catch
+          :exit, _ -> %{is_supervisor: false}
+        end
+      end)
+
+    # Wait for a short period. A responsive supervisor will reply almost instantly.
+    # Non-supervisors will cause a timeout here, which we handle gracefully.
+    case Task.yield(task, 200) do
+      {:ok, result} ->
+        Task.shutdown(task)
+        result
+
+      _ ->
+        # Task timed out or crashed.
+        Task.shutdown(task, :brutal_kill)
+        %{is_supervisor: false, child_count: 0, strategy: :unknown}
     end
   end
 
-  defp get_process_application_from_name(name) when is_atom(name) do
-    case Process.whereis(name) do
-      nil -> :system
-      pid -> get_process_application_from_pid(pid)
+  defp get_process_name(pid) do
+    case Process.info(pid, :registered_name) do
+      {:registered_name, name} when name != [] -> name
+      # Fallback to the PID itself if it has no registered name
+      _ -> pid
     end
   end
 
