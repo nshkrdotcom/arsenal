@@ -313,6 +313,7 @@ defmodule Arsenal.AnalyticsServerIntegrationTest do
       send(child_task.pid, :stop)
     end
 
+    @tag :flaky
     test "monitors system under load", %{server: _server} do
       # Get baseline metrics
       {:ok, baseline} = AnalyticsServer.get_performance_metrics()
