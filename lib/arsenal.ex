@@ -13,6 +13,9 @@ defmodule Arsenal do
       # Start the operation registry
       Arsenal.Registry,
 
+      # Start the analytics server for monitoring
+      Arsenal.AnalyticsServer,
+
       # Create other ETS tables if needed
       {Task, fn -> ensure_other_ets_tables() end}
     ]

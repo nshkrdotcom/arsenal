@@ -30,22 +30,23 @@ defmodule Arsenal.MixProject do
     [
       # Documentation
       {:ex_doc, "~> 0.30", only: :dev, runtime: false},
-      
+
       # JSON encoding (optional - users can provide their own)
       {:jason, "~> 1.4", optional: true},
-      
+
       # Code analysis
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      
+
       # Testing
-      {:stream_data, "~> 1.0", only: [:dev, :test]}
+      {:stream_data, "~> 1.0", only: [:dev, :test]},
+      {:supertester, path: "../supertester", only: :test}
     ]
   end
 
   defp description do
     """
     A metaprogramming framework for building REST APIs from OTP operations.
-    
+
     Arsenal enables automatic REST API generation by defining operations
     as simple Elixir modules with behavior callbacks. It provides a registry
     system, operation discovery, parameter validation, and OpenAPI documentation
@@ -74,7 +75,7 @@ defmodule Arsenal.MixProject do
       source_ref: "v#{@version}",
       extras: ["README.md", "CHANGELOG.md"],
       groups_for_modules: [
-        "Core": [
+        Core: [
           Arsenal,
           Arsenal.Operation,
           Arsenal.Registry

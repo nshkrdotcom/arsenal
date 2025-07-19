@@ -84,15 +84,34 @@ defmodule Arsenal.Operations.GetProcessInfo do
   end
 
   def execute(%{"pid" => pid} = params) do
-    if Process.alive?(pid) do
-      keys = Map.get(params, "keys", :all)
+    # Handle case where validation might have failed to convert string to PID
+    case ensure_pid(pid) do
+      {:ok, actual_pid} ->
+        if Process.alive?(actual_pid) do
+          execute_with_pid(actual_pid, params)
+        else
+          {:error, {:process_not_alive, actual_pid}}
+        end
 
-      case get_process_information(pid, keys) do
-        {:ok, info} -> {:ok, info}
-        {:error, reason} -> {:error, reason}
-      end
-    else
-      {:error, :process_not_found}
+      {:error, reason} ->
+        {:error, {:invalid_parameter, :pid, reason}}
+    end
+  end
+
+  defp ensure_pid(pid) when is_pid(pid), do: {:ok, pid}
+  defp ensure_pid(pid_string) when is_binary(pid_string), do: parse_pid(pid_string)
+
+  defp execute_with_pid(pid, params) do
+    keys = Map.get(params, "keys", :all)
+
+    case get_process_information(pid, keys) do
+      {:ok, info} ->
+        # Include the PID in the response
+        info_with_pid = Map.put(info, :pid, pid)
+        {:ok, info_with_pid}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

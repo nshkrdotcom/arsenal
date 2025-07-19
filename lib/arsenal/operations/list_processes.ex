@@ -1,7 +1,7 @@
 defmodule Arsenal.Operations.ListProcesses do
   @moduledoc """
   Example operation that lists all processes in the system.
-  
+
   This demonstrates a simple GET operation without parameters.
   """
 
@@ -60,13 +60,13 @@ defmodule Arsenal.Operations.ListProcesses do
   def validate_params(params) do
     limit = get_integer_param(params, "limit", 100)
     sort_by = get_sort_by(params)
-    
+
     {:ok, %{limit: limit, sort_by: sort_by}}
   end
 
   @impl true
   def execute(%{limit: limit, sort_by: sort_by}) do
-    processes = 
+    processes =
       Process.list()
       |> Enum.map(&get_process_info/1)
       |> Enum.filter(&(&1 != nil))
@@ -93,14 +93,20 @@ defmodule Arsenal.Operations.ListProcesses do
 
   defp get_integer_param(params, key, default) do
     case Map.get(params, key) do
-      nil -> default
+      nil ->
+        default
+
       value when is_binary(value) ->
         case Integer.parse(value) do
           {int, ""} -> int
           _ -> default
         end
-      value when is_integer(value) -> value
-      _ -> default
+
+      value when is_integer(value) ->
+        value
+
+      _ ->
+        default
     end
   end
 
@@ -116,7 +122,9 @@ defmodule Arsenal.Operations.ListProcesses do
   defp get_process_info(pid) do
     try do
       case Process.info(pid, [:memory, :reductions, :message_queue_len]) do
-        nil -> nil
+        nil ->
+          nil
+
         info ->
           %{
             pid: pid,

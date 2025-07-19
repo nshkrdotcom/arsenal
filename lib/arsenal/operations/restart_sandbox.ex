@@ -61,27 +61,9 @@ defmodule Arsenal.Operations.RestartSandbox do
     {:error, {:missing_parameter, "sandbox_id is required"}}
   end
 
-  def execute(%{"sandbox_id" => sandbox_id}) do
+  def execute(%{"sandbox_id" => _sandbox_id}) do
     # TODO: Replace with Arsenal.SandboxManager when available
-    case restart_sandbox_placeholder(sandbox_id) do
-      {:ok, restarted_sandbox_info} ->
-        restarted_at = DateTime.utc_now()
-
-        # Log the restart
-        require Logger
-
-        Logger.info(
-          "Sandbox #{sandbox_id} restarted via Arsenal API at #{DateTime.to_iso8601(restarted_at)}"
-        )
-
-        {:ok, {restarted_sandbox_info, restarted_at}}
-
-      {:error, :not_found} ->
-        {:error, :sandbox_not_found}
-
-      {:error, reason} ->
-        {:error, {:restart_failed, reason}}
-    end
+    {:error, :sandbox_not_found}
   end
 
   def format_response({sandbox_info, restarted_at}) do
@@ -98,11 +80,6 @@ defmodule Arsenal.Operations.RestartSandbox do
         opts: sandbox_info.opts
       }
     }
-  end
-
-  # TODO: Replace with actual SandboxManager implementation
-  defp restart_sandbox_placeholder(_sandbox_id) do
-    {:error, :not_found}
   end
 
   defp validate_sandbox_id(sandbox_id) when is_binary(sandbox_id) and byte_size(sandbox_id) > 0 do

@@ -90,24 +90,25 @@ defmodule Arsenal.Registry do
     try do
       # Ensure module is loaded
       Code.ensure_loaded(module)
-      
+
       # Check if module implements the Operation behavior
       if function_exported?(module, :rest_config, 0) do
         config = module.rest_config()
 
         # Validate config structure
         case validate_rest_config(config) do
-          :ok -> 
+          :ok ->
             Logger.debug("Registered Arsenal operation: #{module}")
             {:ok, Map.put(config, :module, module)}
-          error -> 
+
+          error ->
             error
         end
       else
         {:error, :not_an_operation}
       end
     rescue
-      error -> 
+      error ->
         {:error, {:module_error, error}}
     end
   end

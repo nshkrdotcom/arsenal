@@ -150,21 +150,24 @@ defmodule Arsenal.Operations.ListSupervisors do
     Process.registered()
     |> Enum.filter(&is_supervisor?/1)
     |> Enum.map(&supervisor_info/1)
-    |> Enum.filter(& &1 != nil)
+    |> Enum.filter(&(&1 != nil))
   end
 
   defp is_supervisor?(name) do
     try do
       pid = Process.whereis(name)
+
       if pid && Process.alive?(pid) do
         case Process.info(pid, :dictionary) do
-          {_, dict} -> 
-            Enum.any?(dict, fn {key, _} -> 
-              key == :"$initial_call" or 
-              key == :"$ancestors" or
-              (is_atom(key) && Atom.to_string(key) =~ "supervisor")
+          {_, dict} ->
+            Enum.any?(dict, fn {key, _} ->
+              key == :"$initial_call" or
+                key == :"$ancestors" or
+                (is_atom(key) && Atom.to_string(key) =~ "supervisor")
             end)
-          _ -> false
+
+          _ ->
+            false
         end
       else
         false
@@ -177,13 +180,15 @@ defmodule Arsenal.Operations.ListSupervisors do
   defp supervisor_info(name) do
     try do
       pid = Process.whereis(name)
+
       if pid && Process.alive?(pid) do
-        children = try do
-          Supervisor.which_children(pid)
-        rescue
-          _ -> []
-        end
-        
+        children =
+          try do
+            Supervisor.which_children(pid)
+          rescue
+            _ -> []
+          end
+
         %{
           name: name,
           pid: inspect(pid),
@@ -205,8 +210,6 @@ defmodule Arsenal.Operations.ListSupervisors do
       pid -> get_process_application_from_pid(pid)
     end
   end
-
-  defp get_process_application_from_name(_), do: :system
 
   defp get_process_application_from_pid(pid) do
     case :application.get_application(pid) do

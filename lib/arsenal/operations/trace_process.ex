@@ -5,7 +5,6 @@ defmodule Arsenal.Operations.TraceProcess do
 
   use Arsenal.Operation
 
-
   def rest_config do
     %{
       method: :post,

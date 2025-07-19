@@ -110,12 +110,6 @@ defmodule Arsenal.Operations.CreateSandbox do
 
     # TODO: Replace with Arsenal.SandboxManager when available
     case create_sandbox_placeholder(sandbox_id, supervisor_module, opts) do
-      {:ok, sandbox_info} ->
-        {:ok, sandbox_info}
-
-      {:error, {:already_exists, existing_sandbox}} ->
-        {:error, {:sandbox_already_exists, existing_sandbox.id}}
-
       {:error, reason} ->
         {:error, {:sandbox_creation_failed, reason}}
     end

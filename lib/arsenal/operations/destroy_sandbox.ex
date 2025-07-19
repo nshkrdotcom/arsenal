@@ -64,11 +64,8 @@ defmodule Arsenal.Operations.DestroySandbox do
     {:error, {:missing_parameter, "sandbox_id is required"}}
   end
 
-  def execute(%{"sandbox_id" => sandbox_id, "force" => force}) do
+  def execute(%{"sandbox_id" => sandbox_id, "force" => _force}) do
     case get_sandbox_info(sandbox_id) do
-      {:ok, sandbox_info} ->
-        perform_destruction(sandbox_id, sandbox_info, force)
-
       {:error, :not_found} ->
         {:error, :sandbox_not_found}
     end
@@ -93,54 +90,5 @@ defmodule Arsenal.Operations.DestroySandbox do
   # TODO: Replace with Arsenal.SandboxManager when available
   defp get_sandbox_info(_sandbox_id) do
     {:error, :not_found}
-  end
-
-  defp perform_destruction(sandbox_id, sandbox_info, force) do
-    cond do
-      not force and has_active_processes?(sandbox_info) ->
-        {:error,
-         {:has_active_processes, "Use force=true to destroy sandbox with active processes"}}
-
-      true ->
-        execute_destruction(sandbox_id)
-    end
-  end
-
-  defp has_active_processes?(sandbox_info) do
-    try do
-      # Check if supervisor has any children
-      case Supervisor.which_children(sandbox_info.supervisor_pid) do
-        children when is_list(children) and length(children) > 0 -> true
-        _ -> false
-      end
-    rescue
-      # If we can't check children, assume it's safe to destroy
-      _ -> false
-    end
-  end
-
-  # TODO: Replace with Arsenal.SandboxManager when available
-  defp execute_destruction(sandbox_id) do
-    case destroy_sandbox_placeholder(sandbox_id) do
-      :ok ->
-        destroyed_at = DateTime.utc_now()
-
-        # Log the destruction
-        require Logger
-
-        Logger.info(
-          "Sandbox #{sandbox_id} destroyed via Arsenal API at #{DateTime.to_iso8601(destroyed_at)}"
-        )
-
-        {:ok, {sandbox_id, destroyed_at}}
-
-      {:error, reason} ->
-        {:error, {:destruction_failed, reason}}
-    end
-  end
-
-  # TODO: Replace with actual SandboxManager implementation
-  defp destroy_sandbox_placeholder(_sandbox_id) do
-    {:error, :not_implemented}
   end
 end
