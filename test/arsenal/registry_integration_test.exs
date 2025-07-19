@@ -1,11 +1,19 @@
 defmodule Arsenal.RegistryIntegrationTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+
+  setup do
+    # Ensure operations are registered before running tests
+    # This makes the test independent of application startup timing
+    {:ok, result} = Arsenal.Startup.register_all_operations()
+
+    # Verify registration completed successfully
+    assert result.successful > 0
+
+    :ok
+  end
 
   describe "operation registration" do
     test "new operations are registered on startup" do
-      # Wait a bit for startup registration
-      Process.sleep(200)
-
       # Check that our new operations are registered
       operations = Arsenal.Registry.list_operations()
       operation_names = Enum.map(operations, & &1.name)
@@ -19,8 +27,6 @@ defmodule Arsenal.RegistryIntegrationTest do
     end
 
     test "can execute get_process_info through registry" do
-      Process.sleep(200)
-
       pid = self()
 
       assert {:ok, info} = Arsenal.Registry.execute_operation(:get_process_info, %{pid: pid})
@@ -31,8 +37,6 @@ defmodule Arsenal.RegistryIntegrationTest do
     end
 
     test "can validate params through registry" do
-      Process.sleep(200)
-
       # Valid params
       assert {:ok, _} =
                Arsenal.Registry.validate_operation_params(:get_process_info, %{pid: self()})
