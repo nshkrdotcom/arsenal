@@ -61,7 +61,10 @@ The main entry point and application supervisor.
 # List all registered operations
 operations = Arsenal.list_operations()
 
-# Execute an operation
+# Execute an operation by name (V2)
+{:ok, result} = Arsenal.Registry.execute(:list_processes, %{"limit" => 10})
+
+# Execute an operation by module (V1 compatibility)
 {:ok, result} = Arsenal.execute_operation(
   Arsenal.Operations.ListProcesses,
   %{"limit" => 10}
@@ -71,35 +74,67 @@ operations = Arsenal.list_operations()
 api_docs = Arsenal.generate_api_docs()
 ```
 
-### 2. Operation Behavior (`lib/arsenal/operation.ex`)
+### 2. V2 Operation Behavior (`lib/arsenal/operation.ex`)
 
-The core protocol that all operations must implement:
+The enhanced V2 operation framework provides a standardized contract for all operations:
 
 ```elixir
 defmodule Arsenal.Operation do
-  @callback rest_config() :: map()
-  @callback validate_params(params :: map()) :: {:ok, map()} | {:error, term()}
+  @callback name() :: atom()
+  @callback category() :: atom()
+  @callback description() :: String.t()
+  @callback params_schema() :: map()
   @callback execute(params :: map()) :: {:ok, term()} | {:error, term()}
-  @callback format_response(result :: term()) :: map()
+  @callback metadata() :: map()
+  @callback rest_config() :: map()
   
-  @optional_callbacks [validate_params: 1, format_response: 1]
+  # Optional callbacks
+  @callback validate_params(params :: map()) :: {:ok, map()} | {:error, term()}
+  @callback format_response(result :: term()) :: map()
+  @callback authorize(params :: map(), context :: map()) :: :ok | {:error, term()}
+  
+  @optional_callbacks [validate_params: 1, format_response: 1, authorize: 2]
 end
 ```
 
-### 3. Registry (`lib/arsenal/registry.ex`)
+Key improvements in V2:
+- **Named Operations**: Operations are registered by name for stable API
+- **Categories**: Operations are organized into logical categories
+- **Automated Validation**: Validation based on `params_schema/0`
+- **Built-in Telemetry**: Automatic telemetry events for all operations
+- **Standardized Metadata**: Consistent metadata for auth, rate limiting, etc.
 
-Manages operation discovery and registration:
+### 3. Enhanced Registry V2 (`lib/arsenal/registry.ex`)
+
+The V2 Registry serves as a central hub for the entire operation lifecycle:
 
 ```elixir
-# Register a new operation
+# Register operations by name
+Arsenal.Registry.register(:my_operation, MyApp.Operations.MyOperation)
+
+# Execute operations with built-in validation and telemetry
+{:ok, result} = Arsenal.Registry.execute(:list_processes, %{"limit" => 10})
+
+# Get operation metadata
+{:ok, metadata} = Arsenal.Registry.get_metadata(:list_processes)
+
+# List operations by category
+operations = Arsenal.Registry.list_by_category(:process)
+
+# Introspect operation schema
+{:ok, schema} = Arsenal.Registry.get_params_schema(:start_process)
+
+# V1 Compatibility - still works
 Arsenal.Registry.register_operation(MyOperation)
-
-# Get operation configuration
 {:ok, config} = Arsenal.Registry.get_operation(MyOperation)
-
-# Discover operations in a namespace
-Arsenal.Registry.discover_operations("Arsenal.Operations")
 ```
+
+Key V2 Registry features:
+- **Lifecycle Management**: Handles discovery, validation, authorization, and execution
+- **Named Registration**: Operations registered by atom names for API stability
+- **Automatic Validation**: Validates params against schema before execution
+- **Telemetry Integration**: Emits standardized events for monitoring
+- **Authorization Hooks**: Built-in support for operation-level authorization
 
 ### 4. Adapter (`lib/arsenal/adapter.ex`)
 
@@ -133,6 +168,154 @@ Arsenal.AnalyticsServer.subscribe_to_events([:restart, :health_alert])
 
 # Get performance metrics
 {:ok, metrics} = Arsenal.AnalyticsServer.get_performance_metrics()
+```
+
+## V2 Operation Framework
+
+Arsenal V2 introduces a robust, standardized framework for operations that reduces boilerplate and improves consistency across the codebase.
+
+### Migration Path and Compatibility Mode
+
+To ensure a smooth transition, Arsenal V2 includes a compatibility mode that allows existing V1 operations to work without modification:
+
+```elixir
+defmodule MyApp.Operations.LegacyOperation do
+  use Arsenal.Operation, compat: true  # Enable compatibility mode
+  
+  # V1 callbacks continue to work
+  @impl true
+  def rest_config do
+    %{
+      method: :get,
+      path: "/api/v1/legacy/:id",
+      summary: "Legacy operation"
+    }
+  end
+  
+  @impl true
+  def execute(params) do
+    # Your existing logic
+  end
+end
+```
+
+All existing operations in Arsenal have been updated to use `compat: true`, allowing them to function within the V2 framework while migration happens gradually.
+
+### V2 Operation Example
+
+Here's a complete V2 operation showcasing the new features:
+
+```elixir
+defmodule Arsenal.OperationsV2.Process.StartProcess do
+  use Arsenal.Operation
+  
+  @impl true
+  def name(), do: :start_process
+  
+  @impl true
+  def category(), do: :process
+  
+  @impl true
+  def description(), do: "Start a new process with configurable options"
+  
+  @impl true
+  def params_schema() do
+    %{
+      module: [type: :atom, required: true],
+      function: [type: :atom, required: true],
+      args: [type: :list, default: []],
+      options: [type: :map, default: %{}],
+      name: [type: :atom, required: false],
+      link: [type: :boolean, default: false],
+      monitor: [type: :boolean, default: false]
+    }
+  end
+  
+  @impl true
+  def metadata() do
+    %{
+      requires_authentication: true,
+      minimum_role: :operator,
+      idempotent: false,
+      timeout: 5_000,
+      rate_limit: {10, :minute}
+    }
+  end
+  
+  @impl true
+  def rest_config() do
+    %{
+      method: :post,
+      path: "/api/v1/processes",
+      summary: "Start a new process",
+      responses: %{
+        201 => %{description: "Process started successfully"},
+        400 => %{description: "Invalid parameters"},
+        409 => %{description: "Process with given name already exists"}
+      }
+    }
+  end
+  
+  @impl true
+  def execute(params) do
+    # Params are already validated based on params_schema
+    # Telemetry events are automatically emitted
+    # Authorization has already been checked
+    
+    with {:ok, pid} <- start_process_logic(params) do
+      {:ok, %{pid: pid, started_at: DateTime.utc_now()}}
+    end
+  end
+end
+```
+
+### Automated Validation and Telemetry
+
+The V2 framework automatically handles common patterns:
+
+#### Parameter Validation
+Parameters are validated against the schema before execution:
+
+```elixir
+# This happens automatically before execute/1 is called
+{:ok, validated_params} = Arsenal.Operation.Validator.validate(
+  params,
+  operation.params_schema()
+)
+```
+
+#### Telemetry Events
+Standard telemetry events are emitted for every operation:
+
+```elixir
+# Automatic events emitted by the framework:
+[:arsenal, :operation, :start]
+[:arsenal, :operation, :stop]
+[:arsenal, :operation, :exception]
+
+# Subscribe to operation events
+:telemetry.attach_many(
+  "arsenal-handler",
+  [
+    [:arsenal, :operation, :start],
+    [:arsenal, :operation, :stop]
+  ],
+  &handle_event/4,
+  nil
+)
+```
+
+### Mix Task for Operation Generation
+
+Arsenal V2 includes a Mix task to generate new operations:
+
+```bash
+# Generate a new V2 operation
+mix arsenal.gen.operation MyApp.Operations.MyNewOperation \
+  --name my_operation \
+  --category custom \
+  --method post \
+  --path "/api/v1/my-operation"
 ```
 
 ## Creating Operations
