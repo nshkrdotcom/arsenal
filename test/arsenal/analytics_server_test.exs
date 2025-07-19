@@ -13,8 +13,12 @@ defmodule Arsenal.AnalyticsServerTest do
       )
 
     on_exit(fn ->
-      if Process.alive?(pid) do
-        GenServer.stop(pid)
+      try do
+        if Process.alive?(pid) do
+          GenServer.stop(pid)
+        end
+      catch
+        :exit, _ -> :ok
       end
     end)
 

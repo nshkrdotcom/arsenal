@@ -16,8 +16,14 @@ defmodule Arsenal do
       # Start the analytics server for monitoring
       Arsenal.AnalyticsServer,
 
-      # Create other ETS tables if needed
-      {Task, fn -> ensure_other_ets_tables() end}
+      # Create other ETS tables and register operations
+      {Task,
+       fn ->
+         ensure_other_ets_tables()
+         # Give registry time to start
+         Process.sleep(100)
+         Arsenal.Startup.register_all_operations()
+       end}
     ]
 
     opts = [strategy: :one_for_one, name: Arsenal.Supervisor]
@@ -99,13 +105,15 @@ defmodule Arsenal do
   defp generate_paths_documentation(operations) do
     operations
     |> Enum.reduce(%{}, fn operation, acc ->
-      path = operation.path
-      method = operation.method
+      # Get REST config which contains path and method
+      rest_config = Map.get(operation, :rest_config, %{})
+      path = Map.get(rest_config, :path, "/api/v1/operations/#{operation.name}/execute")
+      method = Map.get(rest_config, :method, :post)
 
       path_doc = %{
-        summary: operation.summary,
-        parameters: format_parameters_for_docs(Map.get(operation, :parameters, [])),
-        responses: Map.get(operation, :responses, %{})
+        summary: Map.get(rest_config, :summary, operation.description),
+        parameters: format_parameters_for_docs(Map.get(rest_config, :parameters, [])),
+        responses: Map.get(rest_config, :responses, %{})
       }
 
       # Add to paths, potentially merging with existing path if multiple methods
@@ -116,17 +124,25 @@ defmodule Arsenal do
     end)
   end
 
-  defp format_parameters_for_docs(parameters) do
-    Enum.map(parameters, fn param ->
-      %{
-        name: param.name,
-        in: param_location_to_openapi(param.location),
-        required: Map.get(param, :required, false),
-        description: Map.get(param, :description, ""),
-        schema: %{type: param.type}
-      }
+  defp format_parameters_for_docs(parameters) when is_list(parameters) do
+    Enum.map(parameters, fn
+      # Handle map format (REST config style)
+      param when is_map(param) ->
+        %{
+          name: param.name,
+          in: param_location_to_openapi(param.location),
+          required: Map.get(param, :required, false),
+          description: Map.get(param, :description, ""),
+          schema: %{type: param.type}
+        }
+
+      # Handle any other format
+      _ ->
+        %{}
     end)
   end
+
+  defp format_parameters_for_docs(_), do: []
 
   defp param_location_to_openapi(:path), do: "path"
   defp param_location_to_openapi(:query), do: "query"

@@ -3,8 +3,28 @@ defmodule Arsenal.Operations.GetProcessInfo do
   Operation to get comprehensive process information.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl Arsenal.Operation
+  def name(), do: :get_process_info
+
+  @impl Arsenal.Operation
+  def category(), do: :process
+
+  @impl Arsenal.Operation
+  def description() do
+    "Get comprehensive information about a specific process"
+  end
+
+  @impl Arsenal.Operation
+  def params_schema() do
+    %{
+      pid: [type: :pid, required: true],
+      keys: [type: :list, default: :all]
+    }
+  end
+
+  @impl Arsenal.Operation
   def rest_config do
     %{
       method: :get,
@@ -52,7 +72,28 @@ defmodule Arsenal.Operations.GetProcessInfo do
     }
   end
 
-  def validate_params(%{"pid" => pid_string} = params) do
+  @impl Arsenal.Operation
+  def validate_params(%{pid: pid} = params) when is_pid(pid) do
+    # Validate keys if provided
+    case Map.get(params, :keys) do
+      nil ->
+        {:ok, Map.put(params, :keys, :all)}
+
+      :all ->
+        {:ok, params}
+
+      keys when is_list(keys) ->
+        case validate_process_info_keys(keys) do
+          {:ok, atom_keys} -> {:ok, Map.put(params, :keys, atom_keys)}
+          {:error, reason} -> {:error, %{keys: reason}}
+        end
+
+      _ ->
+        {:error, %{keys: "must be a list of atoms or :all"}}
+    end
+  end
+
+  def validate_params(%{"pid" => pid_string} = params) when is_binary(pid_string) do
     case parse_pid(pid_string) do
       {:ok, pid} ->
         validated_params = Map.put(params, "pid", pid)
@@ -83,6 +124,15 @@ defmodule Arsenal.Operations.GetProcessInfo do
     {:error, {:missing_parameter, :pid}}
   end
 
+  @impl Arsenal.Operation
+  def execute(%{pid: pid} = params) when is_pid(pid) do
+    if Process.alive?(pid) do
+      execute_with_pid(pid, params)
+    else
+      {:error, {:process_not_alive, pid}}
+    end
+  end
+
   def execute(%{"pid" => pid} = params) do
     # Handle case where validation might have failed to convert string to PID
     case ensure_pid(pid) do
@@ -102,7 +152,7 @@ defmodule Arsenal.Operations.GetProcessInfo do
   defp ensure_pid(pid_string) when is_binary(pid_string), do: parse_pid(pid_string)
 
   defp execute_with_pid(pid, params) do
-    keys = Map.get(params, "keys", :all)
+    keys = Map.get(params, :keys, :all)
 
     case get_process_information(pid, keys) do
       {:ok, info} ->
@@ -113,6 +163,21 @@ defmodule Arsenal.Operations.GetProcessInfo do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  @impl Arsenal.Operation
+  def format_response({:ok, info}) do
+    %{
+      success: true,
+      data: format_process_info(info)
+    }
+  end
+
+  def format_response({:error, reason}) do
+    %{
+      success: false,
+      error: reason
+    }
   end
 
   def format_response(info) when is_map(info) do
@@ -186,24 +251,20 @@ defmodule Arsenal.Operations.GetProcessInfo do
   end
 
   defp get_process_information(pid, :all) do
+    # Get all info plus memory specifically
     case Process.info(pid) do
       nil ->
         {:error, :process_not_found}
 
       info ->
-        # Add memory info if not present
+        # Convert keyword list to map
         info_map = Enum.into(info, %{})
 
+        # Ensure memory is included (it's not in the default Process.info/1)
         info_with_memory =
-          case Map.get(info_map, :memory) do
-            nil ->
-              case Process.info(pid, :memory) do
-                nil -> info_map
-                memory -> Map.put(info_map, :memory, memory)
-              end
-
-            _ ->
-              info_map
+          case Process.info(pid, :memory) do
+            {:memory, memory} -> Map.put(info_map, :memory, memory)
+            _ -> info_map
           end
 
         {:ok, info_with_memory}
@@ -214,7 +275,12 @@ defmodule Arsenal.Operations.GetProcessInfo do
     try do
       info =
         keys
-        |> Enum.map(fn key -> {key, Process.info(pid, key)} end)
+        |> Enum.map(fn key ->
+          case Process.info(pid, key) do
+            {^key, value} -> {key, value}
+            nil -> {key, nil}
+          end
+        end)
         |> Enum.into(%{})
 
       {:ok, info}
