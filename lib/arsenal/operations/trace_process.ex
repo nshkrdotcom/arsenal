@@ -3,7 +3,7 @@ defmodule Arsenal.Operations.TraceProcess do
   Operation to enable/disable process tracing with various options.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{

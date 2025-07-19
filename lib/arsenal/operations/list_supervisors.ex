@@ -3,7 +3,7 @@ defmodule Arsenal.Operations.ListSupervisors do
   Operation to list all supervisors in the system.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{

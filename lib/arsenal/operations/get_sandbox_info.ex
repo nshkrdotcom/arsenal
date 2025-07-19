@@ -3,7 +3,7 @@ defmodule Arsenal.Operations.GetSandboxInfo do
   Operation to get detailed information about a specific sandbox.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{

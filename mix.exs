@@ -21,7 +21,7 @@ defmodule Arsenal.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :eex],
       mod: {Arsenal, []}
     ]
   end
@@ -33,6 +33,9 @@ defmodule Arsenal.MixProject do
 
       # JSON encoding (optional - users can provide their own)
       {:jason, "~> 1.4", optional: true},
+
+      # Telemetry for metrics
+      {:telemetry, "~> 1.0"},
 
       # Code analysis
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},

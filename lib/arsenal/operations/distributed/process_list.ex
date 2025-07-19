@@ -6,7 +6,7 @@ defmodule Arsenal.Operations.Distributed.ProcessList do
   with filtering capabilities and detailed process information.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{

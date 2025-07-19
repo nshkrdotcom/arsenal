@@ -8,6 +8,26 @@ defmodule Arsenal.Operations.ListProcesses do
   use Arsenal.Operation
 
   @impl true
+  def name(), do: :list_processes_v1
+
+  @impl true
+  def category(), do: :process
+
+  @impl true
+  def description(), do: "List all processes in the system"
+
+  @impl true
+  def params_schema() do
+    %{
+      limit: [type: :integer, default: 100, min: 1, max: 1000],
+      sort_by: [type: :atom, default: :memory, in: [:memory, :reductions, :message_queue_len]]
+    }
+  end
+
+  @impl true
+  def metadata(), do: %{}
+
+  @impl true
   def rest_config do
     %{
       method: :get,
@@ -57,14 +77,6 @@ defmodule Arsenal.Operations.ListProcesses do
   end
 
   @impl true
-  def validate_params(params) do
-    limit = get_integer_param(params, "limit", 100)
-    sort_by = get_sort_by(params)
-
-    {:ok, %{limit: limit, sort_by: sort_by}}
-  end
-
-  @impl true
   def execute(%{limit: limit, sort_by: sort_by}) do
     processes =
       Process.list()
@@ -90,34 +102,6 @@ defmodule Arsenal.Operations.ListProcesses do
   end
 
   # Private helpers
-
-  defp get_integer_param(params, key, default) do
-    case Map.get(params, key) do
-      nil ->
-        default
-
-      value when is_binary(value) ->
-        case Integer.parse(value) do
-          {int, ""} -> int
-          _ -> default
-        end
-
-      value when is_integer(value) ->
-        value
-
-      _ ->
-        default
-    end
-  end
-
-  defp get_sort_by(params) do
-    case Map.get(params, "sort_by") do
-      "memory" -> :memory
-      "reductions" -> :reductions
-      "message_queue" -> :message_queue_len
-      _ -> :memory
-    end
-  end
 
   defp get_process_info(pid) do
     try do

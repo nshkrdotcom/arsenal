@@ -6,7 +6,7 @@ defmodule Arsenal.Operations.Distributed.ClusterTopology do
   connectivity, and process distribution across the cluster.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{

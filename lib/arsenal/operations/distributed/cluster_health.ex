@@ -6,7 +6,7 @@ defmodule Arsenal.Operations.Distributed.ClusterHealth do
   node status, resource usage, connectivity, and performance metrics.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{

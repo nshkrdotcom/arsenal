@@ -7,7 +7,7 @@ defmodule Arsenal.Operations.Distributed.ClusterSupervisionTrees do
   metadata for cluster-wide supervision tree analysis and visualization.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{

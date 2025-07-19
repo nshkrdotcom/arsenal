@@ -1,29 +1,24 @@
 defmodule Arsenal.AnalyticsServerTest do
   use ExUnit.Case, async: true
 
-  alias Arsenal.AnalyticsServer
-  import Supertester.OTPHelpers
-
   @moduletag :capture_log
 
   setup do
     # Start isolated AnalyticsServer without name conflicts
+    # We need to start it directly without the registered name to avoid conflicts
     {:ok, pid} =
-      start_analytics_server_isolated(monitoring_interval: 1000, retention_period: 5000)
+      GenServer.start_link(Arsenal.AnalyticsServer,
+        monitoring_interval: 1000,
+        retention_period: 5000
+      )
 
-    cleanup_on_exit(fn ->
+    on_exit(fn ->
       if Process.alive?(pid) do
         GenServer.stop(pid)
       end
     end)
 
     %{server: pid}
-  end
-
-  # Helper to start AnalyticsServer without name registration
-  defp start_analytics_server_isolated(opts \\ []) do
-    # Start AnalyticsServer directly without name registration
-    GenServer.start_link(AnalyticsServer, opts)
   end
 
   # Wrapper functions to work with isolated server instances
@@ -65,14 +60,14 @@ defmodule Arsenal.AnalyticsServerTest do
 
   describe "start_link/1" do
     test "starts with default configuration" do
-      {:ok, pid} = start_analytics_server_isolated()
+      {:ok, pid} = GenServer.start_link(Arsenal.AnalyticsServer, [])
       assert Process.alive?(pid)
       GenServer.stop(pid)
     end
 
     test "starts with custom configuration" do
       opts = [monitoring_interval: 1000, retention_period: 10000, anomaly_threshold: 1.5]
-      {:ok, pid} = start_analytics_server_isolated(opts)
+      {:ok, pid} = GenServer.start_link(Arsenal.AnalyticsServer, opts)
       assert Process.alive?(pid)
 
       {:ok, stats} = GenServer.call(pid, :get_server_stats)
@@ -539,7 +534,7 @@ defmodule Arsenal.AnalyticsServerTest do
   describe "integration with real supervisors" do
     test "works with actual supervisor processes" do
       # Start isolated server and test supervisor
-      {:ok, server} = start_analytics_server_isolated()
+      {:ok, server} = GenServer.start_link(Arsenal.AnalyticsServer, [])
       {:ok, sup_pid} = Supervisor.start_link([], strategy: :one_for_one)
 
       # Track restart for real supervisor

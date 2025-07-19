@@ -3,7 +3,7 @@ defmodule Arsenal.Operations.DestroySandbox do
   Operation to destroy/terminate a sandbox environment.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{

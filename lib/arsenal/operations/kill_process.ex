@@ -3,7 +3,7 @@ defmodule Arsenal.Operations.KillProcess do
   Operation to terminate a process with a specific reason.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{

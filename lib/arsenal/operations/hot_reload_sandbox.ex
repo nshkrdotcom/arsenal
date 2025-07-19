@@ -3,7 +3,7 @@ defmodule Arsenal.Operations.HotReloadSandbox do
   Operation to hot reload a sandbox with updated code.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{

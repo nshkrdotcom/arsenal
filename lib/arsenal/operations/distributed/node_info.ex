@@ -6,7 +6,7 @@ defmodule Arsenal.Operations.Distributed.NodeInfo do
   including processes, resource usage, and health metrics.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{

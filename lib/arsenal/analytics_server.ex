@@ -305,9 +305,12 @@ defmodule Arsenal.AnalyticsServer do
     schedule_health_check(0)
     schedule_cleanup()
 
-    Logger.info(
-      "Arsenal.AnalyticsServer started with monitoring interval: #{monitoring_interval}ms"
-    )
+    # Log startup unless explicitly disabled
+    if Application.get_env(:arsenal, :log_analytics_startup, true) do
+      Logger.info(
+        "Arsenal.AnalyticsServer started with monitoring interval: #{monitoring_interval}ms"
+      )
+    end
 
     {:ok, state}
   end
@@ -622,7 +625,7 @@ defmodule Arsenal.AnalyticsServer do
   end
 
   defp check_memory_health(memory) do
-    utilization = memory.used / memory.total * 100
+    utilization = if memory.total > 0, do: memory.used / memory.total * 100, else: 0
 
     cond do
       utilization > 90 -> :critical

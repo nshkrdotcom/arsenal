@@ -3,7 +3,7 @@ defmodule Arsenal.Operations.CreateSandbox do
   Operation to create a new sandbox environment.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{

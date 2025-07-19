@@ -3,7 +3,7 @@ defmodule Arsenal.Operations.SendMessage do
   Operation to send arbitrary messages to a process.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{

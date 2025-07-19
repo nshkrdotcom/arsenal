@@ -6,7 +6,7 @@ defmodule Arsenal.Operations.Distributed.HordeRegistryInspect do
   registry, including their location, metadata, and health status.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{

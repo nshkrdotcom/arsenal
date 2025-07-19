@@ -3,7 +3,7 @@ defmodule Arsenal.Operations.RestartSandbox do
   Operation to restart a sandbox environment.
   """
 
-  use Arsenal.Operation
+  use Arsenal.Operation, compat: true
 
   def rest_config do
     %{
