@@ -39,7 +39,7 @@ defmodule Arsenal.MixProject do
 
       # Testing
       {:stream_data, "~> 1.0", only: [:dev, :test]},
-      {:supertester, path: "../supertester", only: :test}
+      {:supertester, github: "nshkrdotcom/supertester", only: :test}
     ]
   end
 
