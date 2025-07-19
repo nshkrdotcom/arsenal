@@ -184,7 +184,7 @@ defmodule Arsenal.Operations.CreateSandbox do
           else
             raise "Module #{module_string} does not export start_link/1"
           end
-        
+
         {:error, _reason} ->
           raise "Module #{module_string} could not be loaded"
       end

@@ -204,7 +204,7 @@ defmodule Arsenal.Operations.Storage.TraceSessionStorage do
         # Guard: check if session is expired
         [
           # Default duration is 60_000ms, stored_at defaults to current_time if missing
-          {">", {"-", current_time, {:map_get, :stored_at, :"$2", current_time}}, 
+          {">", {"-", current_time, {:map_get, :stored_at, :"$2", current_time}},
            {:map_get, :duration, :"$2", 60_000}}
         ],
         # Return: true (delete the record)
@@ -215,5 +215,4 @@ defmodule Arsenal.Operations.Storage.TraceSessionStorage do
     # This directly deletes expired records and returns the count
     :ets.select_delete(@table_name, match_spec)
   end
-
 end

@@ -675,15 +675,21 @@ defmodule Arsenal.AnalyticsServer do
     # PERFORMANCE: Process the queue length checks concurrently
     queue_lengths =
       processes
-      |> Task.async_stream(fn pid ->
-        case Process.info(pid, :message_queue_len) do
-          {:message_queue_len, len} -> len
-          nil -> 0
-        end
-      end, max_concurrency: System.schedulers_online() * 2, ordered: false, timeout: 500)
+      |> Task.async_stream(
+        fn pid ->
+          case Process.info(pid, :message_queue_len) do
+            {:message_queue_len, len} -> len
+            nil -> 0
+          end
+        end,
+        max_concurrency: System.schedulers_online() * 2,
+        ordered: false,
+        timeout: 500
+      )
       |> Enum.flat_map(fn
         {:ok, len} -> [len]
-        {:exit, _reason} -> [0] # Handle timeouts/crashes gracefully
+        # Handle timeouts/crashes gracefully
+        {:exit, _reason} -> [0]
       end)
 
     max_queue = Enum.max(queue_lengths, fn -> 0 end)
@@ -1132,30 +1138,42 @@ defmodule Arsenal.AnalyticsServer do
   defp count_runnable_processes do
     # PERFORMANCE: Process status checks concurrently
     Process.list()
-    |> Task.async_stream(fn pid ->
-      case Process.info(pid, :status) do
-        {:status, :runnable} -> 1
-        _ -> 0
-      end
-    end, max_concurrency: System.schedulers_online() * 2, ordered: false, timeout: 500)
+    |> Task.async_stream(
+      fn pid ->
+        case Process.info(pid, :status) do
+          {:status, :runnable} -> 1
+          _ -> 0
+        end
+      end,
+      max_concurrency: System.schedulers_online() * 2,
+      ordered: false,
+      timeout: 500
+    )
     |> Enum.reduce(0, fn
       {:ok, count}, acc -> acc + count
-      {:exit, _reason}, acc -> acc # Handle timeouts/crashes gracefully
+      # Handle timeouts/crashes gracefully
+      {:exit, _reason}, acc -> acc
     end)
   end
 
   defp count_running_processes do
     # PERFORMANCE: Process status checks concurrently
     Process.list()
-    |> Task.async_stream(fn pid ->
-      case Process.info(pid, :status) do
-        {:status, :running} -> 1
-        _ -> 0
-      end
-    end, max_concurrency: System.schedulers_online() * 2, ordered: false, timeout: 500)
+    |> Task.async_stream(
+      fn pid ->
+        case Process.info(pid, :status) do
+          {:status, :running} -> 1
+          _ -> 0
+        end
+      end,
+      max_concurrency: System.schedulers_online() * 2,
+      ordered: false,
+      timeout: 500
+    )
     |> Enum.reduce(0, fn
       {:ok, count}, acc -> acc + count
-      {:exit, _reason}, acc -> acc # Handle timeouts/crashes gracefully
+      # Handle timeouts/crashes gracefully
+      {:exit, _reason}, acc -> acc
     end)
   end
 

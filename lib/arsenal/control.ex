@@ -286,12 +286,15 @@ defmodule Arsenal.Control do
               # Use safe task-based check as fallback
               get_supervisor_details_safely(pid).is_supervisor
             end
+
           _ ->
             # No initial call info, use safe task-based check
             get_supervisor_details_safely(pid).is_supervisor
         end
+
       _ ->
-        false # Does not trap exits, cannot be a supervisor
+        # Does not trap exits, cannot be a supervisor
+        false
     end
   rescue
     ArgumentError -> false
@@ -300,13 +303,16 @@ defmodule Arsenal.Control do
   # Check if the initial call looks like a supervisor
   defp looks_like_supervisor?({:supervisor, _, _}), do: true
   defp looks_like_supervisor?({Supervisor, :init, 1}), do: true
+
   defp looks_like_supervisor?({module, _, _}) do
     # Check if module name contains "Supervisor" or "Sup"
     module_string = to_string(module)
-    String.contains?(module_string, "Supervisor") or 
-    String.contains?(module_string, "Sup") or
-    String.ends_with?(module_string, ".Supervisor")
+
+    String.contains?(module_string, "Supervisor") or
+      String.contains?(module_string, "Sup") or
+      String.ends_with?(module_string, ".Supervisor")
   end
+
   defp looks_like_supervisor?(_), do: false
 
   defp get_supervisor_details_safely(pid) do

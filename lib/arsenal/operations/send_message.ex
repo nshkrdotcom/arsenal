@@ -146,11 +146,15 @@ defmodule Arsenal.Operations.SendMessage do
   end
 
   defp validate_message(nil), do: {:error, {:missing_parameter, :message}}
+
   defp validate_message(message) do
     case parse_message_content(message) do
-      {:error, :invalid_message_type} -> 
-        {:error, {:invalid_parameter, :message, "invalid message type - must be one of: call, cast, info, custom_event, notification, signal"}}
-      parsed_message -> 
+      {:error, :invalid_message_type} ->
+        {:error,
+         {:invalid_parameter, :message,
+          "invalid message type - must be one of: call, cast, info, custom_event, notification, signal"}}
+
+      parsed_message ->
         {:ok, parsed_message}
     end
   end
@@ -185,7 +189,7 @@ defmodule Arsenal.Operations.SendMessage do
           # Reject messages with unknown types to prevent atom exhaustion
           {:error, :invalid_message_type}
         end
-        
+
       _invalid_type ->
         {:error, :invalid_message_type}
     end
