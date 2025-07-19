@@ -6,8 +6,21 @@ defmodule Arsenal.Operations.Distributed.ProcessList do
   with filtering capabilities and detailed process information.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl true
+  def name(), do: :process_list
+
+  @impl true
+  def category(), do: :distributed
+
+  @impl true
+  def description(), do: "List processes across the cluster"
+
+  @impl true
+  def params_schema(), do: %{}
+
+  @impl true
   def rest_config do
     %{
       method: :get,
@@ -56,6 +69,7 @@ defmodule Arsenal.Operations.Distributed.ProcessList do
     }
   end
 
+  @impl true
   def validate_params(params) do
     validated_params =
       params
@@ -67,11 +81,13 @@ defmodule Arsenal.Operations.Distributed.ProcessList do
     {:ok, validated_params}
   end
 
+  @impl true
   def execute(_params) do
     # TODO: Implement process list functionality when clustering is available
     {:error, :cluster_not_available}
   end
 
+  @impl true
   def format_response(result) do
     %{
       data: result,

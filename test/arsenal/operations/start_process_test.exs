@@ -1,7 +1,7 @@
-defmodule Arsenal.OperationsV2.Process.StartProcessTest do
+defmodule Arsenal.Operations.StartProcessTest do
   use ExUnit.Case, async: true
 
-  alias Arsenal.OperationsV2.Process.StartProcess
+  alias Arsenal.Operations.StartProcess
 
   # Helper module for testing
   defmodule TestWorker do

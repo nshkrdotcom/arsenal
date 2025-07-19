@@ -3,8 +3,27 @@ defmodule Arsenal.Operations.CreateSandbox do
   Operation to create a new sandbox environment.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl true
+  def name(), do: :create_sandbox
+
+  @impl true
+  def category(), do: :sandbox
+
+  @impl true
+  def description(), do: "Create a new sandbox environment"
+
+  @impl true
+  def params_schema() do
+    %{
+      name: [type: :string, required: false],
+      module: [type: :atom, required: false],
+      children: [type: :list, default: []]
+    }
+  end
+
+  @impl true
   def rest_config do
     %{
       method: :post,
@@ -75,6 +94,7 @@ defmodule Arsenal.Operations.CreateSandbox do
     }
   end
 
+  @impl true
   def validate_params(
         %{"sandbox_id" => sandbox_id, "supervisor_module" => supervisor_module} = params
       ) do
@@ -91,10 +111,12 @@ defmodule Arsenal.Operations.CreateSandbox do
     error -> {:error, {:invalid_parameters, error}}
   end
 
+  @impl true
   def validate_params(_params) do
     {:error, {:missing_parameters, "sandbox_id and supervisor_module are required"}}
   end
 
+  @impl true
   def execute(%{
         "sandbox_id" => sandbox_id,
         "supervisor_module" => supervisor_module,
@@ -115,6 +137,7 @@ defmodule Arsenal.Operations.CreateSandbox do
     end
   end
 
+  @impl true
   def format_response(sandbox_info) do
     %{
       data: %{

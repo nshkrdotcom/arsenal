@@ -1,7 +1,7 @@
 defmodule Arsenal.MixProject do
   use Mix.Project
 
-  @version "0.0.1"
+  @version "0.1.0"
   @source_url "https://github.com/nshkrdotcom/arsenal"
 
   def project do
@@ -48,12 +48,7 @@ defmodule Arsenal.MixProject do
 
   defp description do
     """
-    A metaprogramming framework for building REST APIs from OTP operations.
-
-    Arsenal enables automatic REST API generation by defining operations
-    as simple Elixir modules with behavior callbacks. It provides a registry
-    system, operation discovery, parameter validation, and OpenAPI documentation
-    generation.
+    A metaprogramming framework for building REST APIs from OTP operations with automatic endpoint generation, parameter validation, and OpenAPI documentation.
     """
   end
 
@@ -66,7 +61,8 @@ defmodule Arsenal.MixProject do
         "Docs" => "https://hexdocs.pm/arsenal"
       },
       maintainers: ["NSHKr <ZeroTrust@NSHkr.com>"],
-      files: ~w(lib .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
+      files: ~w(lib assets .formatter.exs mix.exs README.md LICENSE CHANGELOG.md),
+      exclude_patterns: ["docs/**"]
     ]
   end
 
@@ -77,6 +73,8 @@ defmodule Arsenal.MixProject do
       source_url: @source_url,
       source_ref: "v#{@version}",
       extras: ["README.md", "CHANGELOG.md"],
+      assets: %{"assets" => "assets"},
+      logo: "assets/arsenal-logo.svg",
       groups_for_modules: [
         Core: [
           Arsenal,

@@ -1,4 +1,14 @@
+<div align="center">
+  <img src="assets/arsenal-logo.svg" alt="Arsenal Logo" width="200" height="231">
+</div>
+
 # Arsenal
+
+[![Hex Version](https://img.shields.io/hexpm/v/arsenal.svg)](https://hex.pm/packages/arsenal)
+[![Hex Downloads](https://img.shields.io/hexpm/dt/arsenal.svg)](https://hex.pm/packages/arsenal)
+[![Documentation](https://img.shields.io/badge/docs-hexdocs-blue.svg)](https://hexdocs.pm/arsenal)
+[![License](https://img.shields.io/hexpm/l/arsenal.svg)](https://github.com/nshkrdotcom/arsenal/blob/main/LICENSE)
+[![GitHub CI](https://github.com/nshkrdotcom/arsenal/workflows/CI/badge.svg)](https://github.com/nshkrdotcom/arsenal/actions)
 
 **A metaprogramming framework for building REST APIs from OTP operations**
 
@@ -34,18 +44,20 @@ Arsenal is a powerful metaprogramming framework that transforms Elixir modules i
 
 ## Architecture
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Web Framework  │───▶│     Adapter     │────▶│     Arsenal     │
-│  (Phoenix/Plug) │     │                 │     │                 │
-└─────────────────┘     └─────────────────┘     └─────────┬───────┘
-                                                          │
-                                   ┌──────────────────────┼─────────────────────┐
-                                   │                      │                     │
-                            ┌──────▼──────┐       ┌───────▼───────┐      ┌──────▼──────┐
-                            │  Registry   │       │  Operations   │      │  Analytics  │
-                            │             │       │               │      │   Server    │
-                            └─────────────┘       └───────────────┘      └─────────────┘
+```mermaid
+flowchart TD
+    A[Web Framework<br/>Phoenix/Plug] --> B[Adapter]
+    B --> C[Arsenal Core]
+    C --> D[Registry]
+    C --> E[Operations]
+    C --> F[Analytics Server]
+    
+    style A fill:#e1f5fe,color:#000
+    style B fill:#f3e5f5,color:#000
+    style C fill:#e8f5e8,color:#000
+    style D fill:#fff3e0,color:#000
+    style E fill:#fff3e0,color:#000
+    style F fill:#fff3e0,color:#000
 ```
 
 ## Core Components
@@ -61,22 +73,16 @@ The main entry point and application supervisor.
 # List all registered operations
 operations = Arsenal.list_operations()
 
-# Execute an operation by name (V2)
+# Execute an operation by name
 {:ok, result} = Arsenal.Registry.execute(:list_processes, %{"limit" => 10})
-
-# Execute an operation by module (V1 compatibility)
-{:ok, result} = Arsenal.execute_operation(
-  Arsenal.Operations.ListProcesses,
-  %{"limit" => 10}
-)
 
 # Generate OpenAPI documentation
 api_docs = Arsenal.generate_api_docs()
 ```
 
-### 2. V2 Operation Behavior (`lib/arsenal/operation.ex`)
+### 2. Operation Behavior (`lib/arsenal/operation.ex`)
 
-The enhanced V2 operation framework provides a standardized contract for all operations:
+The operation framework provides a standardized contract for all operations:
 
 ```elixir
 defmodule Arsenal.Operation do
@@ -97,16 +103,16 @@ defmodule Arsenal.Operation do
 end
 ```
 
-Key improvements in V2:
+Key features:
 - **Named Operations**: Operations are registered by name for stable API
 - **Categories**: Operations are organized into logical categories
 - **Automated Validation**: Validation based on `params_schema/0`
 - **Built-in Telemetry**: Automatic telemetry events for all operations
 - **Standardized Metadata**: Consistent metadata for auth, rate limiting, etc.
 
-### 3. Enhanced Registry V2 (`lib/arsenal/registry.ex`)
+### 3. Registry (`lib/arsenal/registry.ex`)
 
-The V2 Registry serves as a central hub for the entire operation lifecycle:
+The Registry serves as a central hub for the entire operation lifecycle:
 
 ```elixir
 # Register operations by name
@@ -124,12 +130,9 @@ operations = Arsenal.Registry.list_by_category(:process)
 # Introspect operation schema
 {:ok, schema} = Arsenal.Registry.get_params_schema(:start_process)
 
-# V1 Compatibility - still works
-Arsenal.Registry.register_operation(MyOperation)
-{:ok, config} = Arsenal.Registry.get_operation(MyOperation)
 ```
 
-Key V2 Registry features:
+Key Registry features:
 - **Lifecycle Management**: Handles discovery, validation, authorization, and execution
 - **Named Registration**: Operations registered by atom names for API stability
 - **Automatic Validation**: Validates params against schema before execution
@@ -170,43 +173,16 @@ Arsenal.AnalyticsServer.subscribe_to_events([:restart, :health_alert])
 {:ok, metrics} = Arsenal.AnalyticsServer.get_performance_metrics()
 ```
 
-## V2 Operation Framework
+## Operation Framework
 
-Arsenal V2 introduces a robust, standardized framework for operations that reduces boilerplate and improves consistency across the codebase.
+Arsenal provides a robust, standardized framework for operations that reduces boilerplate and improves consistency across the codebase.
 
-### Migration Path and Compatibility Mode
+### Operation Example
 
-To ensure a smooth transition, Arsenal V2 includes a compatibility mode that allows existing V1 operations to work without modification:
-
-```elixir
-defmodule MyApp.Operations.LegacyOperation do
-  use Arsenal.Operation, compat: true  # Enable compatibility mode
-  
-  # V1 callbacks continue to work
-  @impl true
-  def rest_config do
-    %{
-      method: :get,
-      path: "/api/v1/legacy/:id",
-      summary: "Legacy operation"
-    }
-  end
-  
-  @impl true
-  def execute(params) do
-    # Your existing logic
-  end
-end
-```
-
-All existing operations in Arsenal have been updated to use `compat: true`, allowing them to function within the V2 framework while migration happens gradually.
-
-### V2 Operation Example
-
-Here's a complete V2 operation showcasing the new features:
+Here's a complete operation showcasing the features:
 
 ```elixir
-defmodule Arsenal.OperationsV2.Process.StartProcess do
+defmodule Arsenal.Operations.StartProcess do
   use Arsenal.Operation
   
   @impl true
@@ -271,7 +247,7 @@ end
 
 ### Automated Validation and Telemetry
 
-The V2 framework automatically handles common patterns:
+The framework automatically handles common patterns:
 
 #### Parameter Validation
 Parameters are validated against the schema before execution:
@@ -307,15 +283,15 @@ Standard telemetry events are emitted for every operation:
 
 ### Mix Task for Operation Generation
 
-Arsenal V2 includes a Mix task to generate new operations:
+Arsenal includes a Mix task to generate new operations:
 
 ```bash
-# Generate a new V2 operation
-mix arsenal.gen.operation MyApp.Operations.MyNewOperation \
-  --name my_operation \
-  --category custom \
-  --method post \
-  --path "/api/v1/my-operation"
+# Generate a new operation
+mix arsenal.gen.operation MyApp.Operations.MyNewOperation custom my_operation
+
+# Examples
+mix arsenal.gen.operation MyApp.Operations.StartWorker process start_worker
+mix arsenal.gen.operation Arsenal.Operations.RestartNode distributed restart_node
 ```
 
 ## Creating Operations
@@ -481,9 +457,17 @@ Arsenal includes built-in operations for process management:
 
 - **ListProcesses**: List all system processes with sorting and filtering
 - **GetProcessInfo**: Get detailed information about a specific process
+- **StartProcess**: Start new processes with configurable options
+- **KillProcess**: Terminate processes with specified reasons
+- **RestartProcess**: Restart supervised processes
 - **TraceProcess**: Enable tracing on a process with configurable flags
-- **SendMessage**: Send messages to processes (when implemented)
-- **KillProcess**: Terminate processes (when implemented)
+- **SendMessage**: Send messages to processes
+
+### Supervisor Operations
+
+Arsenal provides operations for managing supervisors:
+
+- **ListSupervisors**: List all supervisors in the system with metadata
 
 ### Distributed Operations
 
@@ -493,6 +477,7 @@ For distributed Elixir systems, Arsenal provides:
 - **NodeInfo**: Get detailed information about specific nodes
 - **ProcessList**: List processes across the cluster
 - **ClusterHealth**: Monitor cluster-wide health metrics
+- **ClusterSupervisionTrees**: Get supervision tree information across the cluster
 - **HordeRegistryInspect**: Inspect Horde registry state (when using Horde)
 
 ### Sandbox Operations
@@ -539,24 +524,39 @@ docs = Arsenal.generate_api_docs()
 
 ### Project Structure
 
-```
-arsenal/
-├── lib/
-│   ├── arsenal.ex                    # Main module and application
-│   └── arsenal/
-│       ├── adapter.ex                # Web framework adapter behavior
-│       ├── analytics_server.ex       # System monitoring and analytics
-│       ├── operation.ex              # Operation behavior definition
-│       ├── registry.ex               # Operation registry
-│       └── operations/               # Built-in operations
-│           ├── create_sandbox.ex
-│           ├── get_process_info.ex
-│           ├── list_processes.ex
-│           ├── trace_process.ex
-│           └── distributed/          # Distributed system operations
-├── test/
-│   └── arsenal_test.exs            # Test suite
-└── mix.exs                          # Project configuration
+```mermaid
+flowchart TD
+    A[arsenal/] --> B[lib/]
+    A --> C[test/]
+    A --> D[mix.exs]
+    
+    B --> E[arsenal.ex]
+    B --> F[arsenal/]
+    B --> G[mix/tasks/]
+    
+    F --> H[adapter.ex]
+    F --> I[analytics_server.ex]
+    F --> J[operation.ex]
+    F --> K[registry.ex]
+    F --> L[operations/]
+    F --> M[startup.ex]
+    F --> N[system_analyzer.ex]
+    
+    L --> O[process operations]
+    L --> P[sandbox operations]
+    L --> Q[distributed/]
+    L --> R[storage/]
+    
+    Q --> S[cluster operations]
+    G --> T[arsenal.gen.operation.ex]
+    
+    C --> U[operation tests]
+    
+    style A fill:#e8f5e8,color:#000
+    style B fill:#fff3e0,color:#000
+    style F fill:#fff3e0,color:#000
+    style L fill:#f3e5f5,color:#000
+    style Q fill:#f3e5f5,color:#000
 ```
 
 ### Adding New Operations

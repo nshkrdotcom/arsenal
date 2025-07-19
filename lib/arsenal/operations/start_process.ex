@@ -1,4 +1,4 @@
-defmodule Arsenal.OperationsV2.Process.StartProcess do
+defmodule Arsenal.Operations.StartProcess do
   @moduledoc """
   Starts a new process with configurable options.
 
@@ -183,6 +183,7 @@ defmodule Arsenal.OperationsV2.Process.StartProcess do
     }
   end
 
+  @impl true
   def format_response({:error, reason}) do
     %{
       success: false,

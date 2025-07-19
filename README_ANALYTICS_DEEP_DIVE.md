@@ -158,7 +158,7 @@ The server implements pattern detection to identify:
 
 ```elixir
 # Get current performance snapshot
-{:ok, metrics} = Arsenal.AnalyticsServer.get_performance_metrics()
+metrics = Arsenal.AnalyticsServer.get_performance_metrics()
 
 # Metrics include:
 # - CPU utilization and scheduler usage
@@ -454,8 +454,9 @@ defmodule MyApp.MetricsExporter do
   end
   
   def handle_info(:export_metrics, state) do
-    with {:ok, metrics} <- Arsenal.AnalyticsServer.get_performance_metrics(),
-         {:ok, health} <- Arsenal.AnalyticsServer.get_system_health() do
+    metrics = Arsenal.AnalyticsServer.get_performance_metrics()
+    health = Arsenal.AnalyticsServer.get_system_health()
+    with :ok <- validate_metrics(metrics, health) do
       export_to_prometheus(metrics, health)
       export_to_datadog(metrics, health)
     end

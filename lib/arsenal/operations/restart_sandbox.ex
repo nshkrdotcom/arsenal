@@ -3,8 +3,21 @@ defmodule Arsenal.Operations.RestartSandbox do
   Operation to restart a sandbox environment.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl true
+  def name(), do: :restart_sandbox
+
+  @impl true
+  def category(), do: :sandbox
+
+  @impl true
+  def description(), do: "Restart a sandbox environment"
+
+  @impl true
+  def params_schema(), do: %{}
+
+  @impl true
   def rest_config do
     %{
       method: :post,
@@ -47,6 +60,7 @@ defmodule Arsenal.Operations.RestartSandbox do
     }
   end
 
+  @impl true
   def validate_params(%{"sandbox_id" => sandbox_id}) do
     validated_params = %{
       "sandbox_id" => validate_sandbox_id(sandbox_id)
@@ -57,15 +71,18 @@ defmodule Arsenal.Operations.RestartSandbox do
     error -> {:error, {:invalid_parameters, error}}
   end
 
+  @impl true
   def validate_params(_params) do
     {:error, {:missing_parameter, "sandbox_id is required"}}
   end
 
+  @impl true
   def execute(%{"sandbox_id" => _sandbox_id}) do
     # TODO: Replace with Arsenal.SandboxManager when available
     {:error, :sandbox_not_found}
   end
 
+  @impl true
   def format_response({sandbox_info, restarted_at}) do
     %{
       data: %{

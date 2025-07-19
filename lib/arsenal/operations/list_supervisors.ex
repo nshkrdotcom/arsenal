@@ -3,8 +3,25 @@ defmodule Arsenal.Operations.ListSupervisors do
   Operation to list all supervisors in the system.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl true
+  def name(), do: :list_supervisors
+
+  @impl true
+  def category(), do: :supervisor
+
+  @impl true
+  def description(), do: "List all supervisors in the system"
+
+  @impl true
+  def params_schema() do
+    %{
+      include_children: [type: :boolean, default: false]
+    }
+  end
+
+  @impl true
   def rest_config do
     %{
       method: :get,
@@ -76,6 +93,7 @@ defmodule Arsenal.Operations.ListSupervisors do
     }
   end
 
+  @impl true
   def validate_params(params) do
     validated = %{
       "include_children" => parse_boolean(Map.get(params, "include_children", false)),
@@ -89,6 +107,7 @@ defmodule Arsenal.Operations.ListSupervisors do
     error -> {:error, {:invalid_parameters, error}}
   end
 
+  @impl true
   def execute(params) do
     try do
       supervisors = discover_supervisors()
@@ -116,6 +135,7 @@ defmodule Arsenal.Operations.ListSupervisors do
     end
   end
 
+  @impl true
   def format_response({supervisors, meta}) do
     %{
       data: Enum.map(supervisors, &format_supervisor_info/1),

@@ -6,8 +6,21 @@ defmodule Arsenal.Operations.Distributed.ClusterHealth do
   node status, resource usage, connectivity, and performance metrics.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl true
+  def name(), do: :cluster_health
+
+  @impl true
+  def category(), do: :distributed
+
+  @impl true
+  def description(), do: "Get cluster health information"
+
+  @impl true
+  def params_schema(), do: %{}
+
+  @impl true
   def rest_config do
     %{
       method: :get,
@@ -35,6 +48,7 @@ defmodule Arsenal.Operations.Distributed.ClusterHealth do
     }
   end
 
+  @impl true
   def validate_params(params) do
     validated_params =
       params
@@ -44,11 +58,13 @@ defmodule Arsenal.Operations.Distributed.ClusterHealth do
     {:ok, validated_params}
   end
 
+  @impl true
   def execute(_params) do
     # TODO: Replace with actual distributed cluster implementation
     {:error, :cluster_not_available}
   end
 
+  @impl true
   def format_response(health_data) do
     %{
       data: health_data,

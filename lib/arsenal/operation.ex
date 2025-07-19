@@ -123,17 +123,11 @@ defmodule Arsenal.Operation do
   @doc """
   Helper macro to use the Arsenal.Operation behaviour with default implementations.
   """
-  defmacro __using__(opts) do
+  defmacro __using__(_opts) do
     quote do
       @behaviour Arsenal.Operation
 
-      # Include compatibility layer if requested
-      if unquote(opts[:compat]) do
-        use Arsenal.OperationCompat
-      else
-        # Only define metadata if not using compat mode
-        def metadata(), do: %{}
-      end
+      def metadata(), do: %{}
 
       def rest_config() do
         %{

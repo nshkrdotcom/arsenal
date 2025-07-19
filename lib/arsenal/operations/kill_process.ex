@@ -1,185 +1,197 @@
 defmodule Arsenal.Operations.KillProcess do
   @moduledoc """
-  Operation to terminate a process with a specific reason.
+  Terminates a process with a specified reason.
+
+  This operation allows killing processes by PID or registered name with
+  various exit reasons. It provides detailed information about the termination
+  including whether the process was successfully killed and its final state.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
-  def rest_config do
+  @impl true
+  def name(), do: :kill_process
+
+  @impl true
+  def category(), do: :process
+
+  @impl true
+  def description(), do: "Terminate a process with specified reason"
+
+  @impl true
+  def params_schema() do
+    %{
+      pid: [type: :pid, required: false],
+      name: [type: :atom, required: false],
+      reason: [type: :atom, default: :killed],
+      timeout: [type: :integer, default: 5000, min: 0, max: 60000]
+    }
+  end
+
+  @impl true
+  def metadata() do
+    %{
+      requires_authentication: true,
+      minimum_role: :operator,
+      idempotent: true,
+      timeout: 10_000
+    }
+  end
+
+  @impl true
+  def rest_config() do
     %{
       method: :delete,
       path: "/api/v1/processes/:pid",
-      summary: "Terminate a process with specified reason",
-      parameters: [
-        %{
-          name: :pid,
-          type: :string,
-          required: true,
-          description: "Process ID to terminate",
-          location: :path
-        },
-        %{
-          name: :reason,
-          type: :string,
-          required: false,
-          description: "Termination reason (default: 'killed')",
-          location: :body
-        },
-        %{
-          name: :force,
-          type: :boolean,
-          required: false,
-          description: "Force termination even if process is critical",
-          location: :body
-        }
-      ],
+      summary: "Terminate a process",
+      parameters: params_schema(),
       responses: %{
-        200 => %{
-          description: "Process terminated successfully",
-          schema: %{
-            type: :object,
-            properties: %{
-              data: %{
-                type: :object,
-                properties: %{
-                  pid: %{type: :string},
-                  reason: %{type: :string},
-                  terminated: %{type: :boolean}
-                }
-              }
-            }
-          }
-        },
+        200 => %{description: "Process terminated successfully"},
         404 => %{description: "Process not found"},
-        403 => %{description: "Cannot terminate critical process"},
         400 => %{description: "Invalid parameters"}
       }
     }
   end
 
-  def validate_params(%{"pid" => pid_string} = params) do
-    case parse_pid(pid_string) do
-      {:ok, pid} ->
-        validated_params = %{
-          "pid" => pid,
-          "reason" => parse_reason(Map.get(params, "reason", "killed")),
-          "force" => Map.get(params, "force", false)
-        }
+  @impl true
+  def validate_params(params) do
+    # Ensure we have either pid or name, but not both
+    case {Map.has_key?(params, :pid), Map.has_key?(params, :name)} do
+      {false, false} ->
+        {:error, %{params: "Either 'pid' or 'name' must be provided"}}
 
-        {:ok, validated_params}
+      {true, true} ->
+        {:error, %{params: "Cannot specify both 'pid' and 'name'"}}
 
-      {:error, reason} ->
-        {:error, {:invalid_parameter, :pid, reason}}
+      _ ->
+        super(params)
     end
   end
 
-  def validate_params(_params) do
-    {:error, {:missing_parameter, :pid}}
-  end
-
-  def execute(%{"pid" => pid, "reason" => reason, "force" => force}) do
-    cond do
-      not Process.alive?(pid) ->
-        {:error, :process_not_found}
-
-      is_critical_process?(pid) and not force ->
-        {:error, :critical_process_protection}
-
-      true ->
-        perform_termination(pid, reason)
+  @impl true
+  def execute(params) do
+    with {:ok, pid} <- resolve_pid(params),
+         {:ok, initial_info} <- get_process_info(pid),
+         :ok <- kill_process(pid, params.reason),
+         {:ok, terminated} <- verify_termination(pid, params.timeout) do
+      {:ok,
+       %{
+         pid: pid,
+         terminated: terminated,
+         reason: params.reason,
+         initial_info: initial_info,
+         execution_time: DateTime.utc_now()
+       }}
     end
   end
 
-  def format_response({pid, reason, terminated}) do
+  # Private helpers
+
+  defp resolve_pid(%{pid: pid}), do: {:ok, pid}
+
+  defp resolve_pid(%{name: name}) do
+    case Process.whereis(name) do
+      nil -> {:error, "Process with name #{inspect(name)} not found"}
+      pid -> {:ok, pid}
+    end
+  end
+
+  defp get_process_info(pid) do
+    case Process.info(pid) do
+      nil ->
+        {:error, "Process #{inspect(pid)} not found"}
+
+      info ->
+        {:ok,
+         %{
+           registered_name: Keyword.get(info, :registered_name),
+           initial_call: format_mfa(Keyword.get(info, :initial_call)),
+           memory: Keyword.get(info, :memory),
+           message_queue_len: Keyword.get(info, :message_queue_len),
+           status: Keyword.get(info, :status),
+           reductions: Keyword.get(info, :reductions)
+         }}
+    end
+  end
+
+  defp kill_process(pid, reason) do
+    try do
+      # Special handling for :kill reason - use Process.exit
+      if reason == :kill do
+        Process.exit(pid, :kill)
+      else
+        # For other reasons, try to send exit signal
+        Process.exit(pid, reason)
+      end
+
+      :ok
+    rescue
+      ArgumentError ->
+        # Process might already be dead
+        :ok
+    end
+  end
+
+  defp verify_termination(pid, timeout) do
+    # Monitor the process to ensure it's terminated
+    ref = Process.monitor(pid)
+
+    receive do
+      {:DOWN, ^ref, :process, ^pid, reason} ->
+        {:ok,
+         %{
+           confirmed: true,
+           exit_reason: reason,
+           terminated_at: DateTime.utc_now()
+         }}
+    after
+      timeout ->
+        Process.demonitor(ref, [:flush])
+
+        # Check if process still exists
+        case Process.info(pid) do
+          nil ->
+            {:ok,
+             %{
+               confirmed: true,
+               exit_reason: :unknown,
+               terminated_at: DateTime.utc_now()
+             }}
+
+          _info ->
+            {:error, "Process failed to terminate within #{timeout}ms"}
+        end
+    end
+  end
+
+  defp format_mfa({module, function, arity}) do
+    "#{inspect(module)}.#{function}/#{arity}"
+  end
+
+  defp format_mfa(other), do: inspect(other)
+
+  @impl true
+  def format_response({:ok, result}) do
     %{
+      success: true,
       data: %{
-        pid: inspect(pid),
-        reason: inspect(reason),
-        terminated: terminated,
-        timestamp: DateTime.utc_now()
+        pid: inspect(result.pid),
+        terminated: result.terminated,
+        reason: result.reason,
+        initial_info: result.initial_info,
+        execution_time: DateTime.to_iso8601(result.execution_time)
       }
     }
   end
 
-  defp parse_pid(pid_string) when is_binary(pid_string) do
-    try do
-      # Handle both "<0.123.0>" and "0.123.0" formats
-      cleaned = String.trim(pid_string, "<>")
-      pid = :erlang.list_to_pid(~c"<#{cleaned}>")
-      {:ok, pid}
-    rescue
-      _ -> {:error, "invalid PID format"}
-    end
-  end
-
-  defp parse_reason(reason) when is_binary(reason) do
-    case reason do
-      "normal" -> :normal
-      "shutdown" -> :shutdown
-      "killed" -> :killed
-      "kill" -> :kill
-      other -> String.to_atom(other)
-    end
-  end
-
-  defp parse_reason(reason) when is_atom(reason), do: reason
-
-  defp is_critical_process?(pid) do
-    # Check if process is part of critical system infrastructure
-    case Process.info(pid, :registered_name) do
-      {:registered_name, name}
-      when is_atom(name) and name in [:kernel_sup, :application_controller, :code_server] ->
-        true
-
-      _ ->
-        # Check if it's a supervisor in the main application tree
-        is_system_supervisor?(pid)
-    end
-  end
-
-  defp is_system_supervisor?(pid) do
-    case Process.info(pid, :dictionary) do
-      {:dictionary, dict} ->
-        Enum.any?(dict, fn
-          {:"$initial_call", {Supervisor, :init, 1}} -> true
-          _ -> false
-        end)
-
-      _ ->
-        false
-    end
-  end
-
-  defp perform_termination(pid, reason) do
-    try do
-      # Log the termination attempt
-      require Logger
-      Logger.info("Terminating process #{inspect(pid)} with reason #{inspect(reason)}")
-
-      # Monitor the process to confirm termination
-      ref = Process.monitor(pid)
-
-      # Send the exit signal
-      Process.exit(pid, reason)
-
-      # Wait for confirmation of termination
-      terminated = wait_for_termination(ref, pid, 100)
-
-      {:ok, {pid, reason, terminated}}
-    rescue
-      error ->
-        {:error, {:termination_failed, error}}
-    end
-  end
-
-  defp wait_for_termination(ref, pid, timeout) do
-    receive do
-      {:DOWN, ^ref, :process, ^pid, _reason} ->
-        true
-    after
-      timeout ->
-        Process.demonitor(ref, [:flush])
-        not Process.alive?(pid)
-    end
+  @impl true
+  def format_response({:error, reason}) do
+    %{
+      success: false,
+      error: %{
+        message: to_string(reason),
+        class: if(reason =~ "not found", do: :not_found, else: :execution)
+      }
+    }
   end
 end

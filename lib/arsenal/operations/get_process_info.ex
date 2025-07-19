@@ -5,18 +5,18 @@ defmodule Arsenal.Operations.GetProcessInfo do
 
   use Arsenal.Operation
 
-  @impl Arsenal.Operation
+  @impl true
   def name(), do: :get_process_info
 
-  @impl Arsenal.Operation
+  @impl true
   def category(), do: :process
 
-  @impl Arsenal.Operation
+  @impl true
   def description() do
     "Get comprehensive information about a specific process"
   end
 
-  @impl Arsenal.Operation
+  @impl true
   def params_schema() do
     %{
       pid: [type: :pid, required: true],
@@ -24,7 +24,7 @@ defmodule Arsenal.Operations.GetProcessInfo do
     }
   end
 
-  @impl Arsenal.Operation
+  @impl true
   def rest_config do
     %{
       method: :get,
@@ -72,7 +72,7 @@ defmodule Arsenal.Operations.GetProcessInfo do
     }
   end
 
-  @impl Arsenal.Operation
+  @impl true
   def validate_params(%{pid: pid} = params) when is_pid(pid) do
     # Validate keys if provided
     case Map.get(params, :keys) do
@@ -93,6 +93,7 @@ defmodule Arsenal.Operations.GetProcessInfo do
     end
   end
 
+  @impl true
   def validate_params(%{"pid" => pid_string} = params) when is_binary(pid_string) do
     case parse_pid(pid_string) do
       {:ok, pid} ->
@@ -120,11 +121,12 @@ defmodule Arsenal.Operations.GetProcessInfo do
     ArgumentError -> {:error, {:invalid_parameter, :keys, "invalid key name"}}
   end
 
+  @impl true
   def validate_params(_params) do
     {:error, {:missing_parameter, :pid}}
   end
 
-  @impl Arsenal.Operation
+  @impl true
   def execute(%{pid: pid} = params) when is_pid(pid) do
     if Process.alive?(pid) do
       execute_with_pid(pid, params)
@@ -133,6 +135,7 @@ defmodule Arsenal.Operations.GetProcessInfo do
     end
   end
 
+  @impl true
   def execute(%{"pid" => pid} = params) do
     # Handle case where validation might have failed to convert string to PID
     case ensure_pid(pid) do
@@ -165,7 +168,7 @@ defmodule Arsenal.Operations.GetProcessInfo do
     end
   end
 
-  @impl Arsenal.Operation
+  @impl true
   def format_response({:ok, info}) do
     %{
       success: true,
@@ -173,6 +176,7 @@ defmodule Arsenal.Operations.GetProcessInfo do
     }
   end
 
+  @impl true
   def format_response({:error, reason}) do
     %{
       success: false,
@@ -180,6 +184,7 @@ defmodule Arsenal.Operations.GetProcessInfo do
     }
   end
 
+  @impl true
   def format_response(info) when is_map(info) do
     %{
       data: format_process_info(info)

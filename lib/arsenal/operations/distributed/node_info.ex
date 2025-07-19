@@ -6,8 +6,21 @@ defmodule Arsenal.Operations.Distributed.NodeInfo do
   including processes, resource usage, and health metrics.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl true
+  def name(), do: :node_info
+
+  @impl true
+  def category(), do: :distributed
+
+  @impl true
+  def description(), do: "Get detailed information about a node"
+
+  @impl true
+  def params_schema(), do: %{}
+
+  @impl true
   def rest_config do
     %{
       method: :get,
@@ -43,6 +56,7 @@ defmodule Arsenal.Operations.Distributed.NodeInfo do
     }
   end
 
+  @impl true
   def validate_params(params) do
     # Validate node parameter
     case params["node"] do
@@ -74,11 +88,13 @@ defmodule Arsenal.Operations.Distributed.NodeInfo do
     end
   end
 
+  @impl true
   def execute(_params) do
     # TODO: Implement node info functionality when clustering is available
     {:error, :cluster_not_available}
   end
 
+  @impl true
   def format_response(node_info) do
     %{
       data: node_info,

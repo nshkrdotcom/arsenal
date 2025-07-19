@@ -7,8 +7,21 @@ defmodule Arsenal.Operations.Distributed.ClusterSupervisionTrees do
   metadata for cluster-wide supervision tree analysis and visualization.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl true
+  def name(), do: :cluster_supervision_trees
+
+  @impl true
+  def category(), do: :distributed
+
+  @impl true
+  def description(), do: "Get cluster supervision tree information"
+
+  @impl true
+  def params_schema(), do: %{}
+
+  @impl true
   def rest_config do
     %{
       method: :get,
@@ -83,6 +96,7 @@ defmodule Arsenal.Operations.Distributed.ClusterSupervisionTrees do
     }
   end
 
+  @impl true
   def validate_params(params) do
     validated_params =
       params
@@ -93,6 +107,7 @@ defmodule Arsenal.Operations.Distributed.ClusterSupervisionTrees do
     {:ok, validated_params}
   end
 
+  @impl true
   def execute(_params) do
     # TODO: Implement cluster supervision trees functionality when clustering is available
     {:error, :cluster_not_available}

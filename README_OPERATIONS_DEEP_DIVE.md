@@ -49,12 +49,42 @@ Every Arsenal operation is a contract between four concerns:
 ```elixir
 defmodule Arsenal.Operation do
   @doc """
+  Returns the unique name of the operation as an atom.
+  """
+  @callback name() :: atom()
+
+  @doc """
+  Returns the category this operation belongs to.
+  """
+  @callback category() :: atom()
+
+  @doc """
+  Returns a human-readable description of what this operation does.
+  """
+  @callback description() :: String.t()
+
+  @doc """
+  Returns the parameter schema for this operation.
+  """
+  @callback params_schema() :: map()
+
+  @doc """
+  Executes the operation with the given parameters.
+  """
+  @callback execute(params :: map()) :: {:ok, term()} | {:error, term()}
+
+  @doc """
+  Returns metadata about the operation.
+  """
+  @callback metadata() :: map()
+
+  @doc """
   Returns the REST endpoint configuration for this operation.
   """
   @callback rest_config() :: map()
 
   @doc """
-  Validates input parameters for the operation.
+  Validates input parameters for the operation. (Optional)
   """
   @callback validate_params(params :: map()) :: {:ok, map()} | {:error, term()}
 

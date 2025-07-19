@@ -3,8 +3,21 @@ defmodule Arsenal.Operations.SendMessage do
   Operation to send arbitrary messages to a process.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl true
+  def name(), do: :send_message
+
+  @impl true
+  def category(), do: :process
+
+  @impl true
+  def description(), do: "Send a message to a process"
+
+  @impl true
+  def params_schema(), do: %{}
+
+  @impl true
   def rest_config do
     %{
       method: :post,
@@ -75,6 +88,7 @@ defmodule Arsenal.Operations.SendMessage do
     }
   end
 
+  @impl true
   def validate_params(%{"pid" => pid_string} = params) do
     with {:ok, pid} <- parse_pid(pid_string),
          {:ok, message} <- validate_message(Map.get(params, "message")),
@@ -92,10 +106,12 @@ defmodule Arsenal.Operations.SendMessage do
     end
   end
 
+  @impl true
   def validate_params(_params) do
     {:error, {:missing_parameter, :pid}}
   end
 
+  @impl true
   def execute(%{
         "pid" => pid,
         "message" => message,
@@ -113,6 +129,7 @@ defmodule Arsenal.Operations.SendMessage do
     end
   end
 
+  @impl true
   def format_response(result) do
     %{data: format_result_values(result)}
   end

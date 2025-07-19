@@ -6,18 +6,18 @@ defmodule Arsenal.Operations.RestartProcess do
 
   use Arsenal.Operation
 
-  @impl Arsenal.Operation
+  @impl true
   def name(), do: :restart_process
 
-  @impl Arsenal.Operation
+  @impl true
   def category(), do: :process
 
-  @impl Arsenal.Operation
+  @impl true
   def description() do
     "Restart a supervised process by terminating it and letting its supervisor restart it"
   end
 
-  @impl Arsenal.Operation
+  @impl true
   def params_schema() do
     %{
       pid: [type: :pid, required: true],
@@ -26,7 +26,7 @@ defmodule Arsenal.Operations.RestartProcess do
     }
   end
 
-  @impl Arsenal.Operation
+  @impl true
   def execute(params) do
     pid = params.pid
     reason = params.reason
@@ -65,7 +65,7 @@ defmodule Arsenal.Operations.RestartProcess do
     end
   end
 
-  @impl Arsenal.Operation
+  @impl true
   def metadata() do
     %{
       requires_authentication: true,

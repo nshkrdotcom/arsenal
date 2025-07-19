@@ -79,7 +79,10 @@ defmodule Arsenal.Operations.RestartProcessTest do
 
       # Wait for process to exit using monitor
       ref = Process.monitor(pid)
-      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 100
+      assert_receive {:DOWN, ^ref, :process, ^pid, reason}, 100
+
+      # The reason could be :normal or :noproc depending on timing
+      assert reason in [:normal, :noproc]
 
       assert {:error, :process_not_alive} =
                RestartProcess.execute(%{

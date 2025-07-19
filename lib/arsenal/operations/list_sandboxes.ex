@@ -3,8 +3,21 @@ defmodule Arsenal.Operations.ListSandboxes do
   Operation to list all sandboxes in the system.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl true
+  def name(), do: :list_sandboxes
+
+  @impl true
+  def category(), do: :sandbox
+
+  @impl true
+  def description(), do: "List all sandbox environments"
+
+  @impl true
+  def params_schema(), do: %{}
+
+  @impl true
   def rest_config do
     %{
       method: :get,
@@ -71,6 +84,7 @@ defmodule Arsenal.Operations.ListSandboxes do
     }
   end
 
+  @impl true
   def validate_params(params) do
     status_val = validate_status(Map.get(params, "status"))
     page_val = parse_positive_integer(Map.get(params, "page", "1"), 1)
@@ -87,6 +101,7 @@ defmodule Arsenal.Operations.ListSandboxes do
     error -> {:error, {:invalid_parameters, error}}
   end
 
+  @impl true
   def execute(params) do
     try do
       # TODO: Replace with Arsenal.SandboxManager when available
@@ -108,6 +123,7 @@ defmodule Arsenal.Operations.ListSandboxes do
     end
   end
 
+  @impl true
   def format_response({sandboxes, meta}) do
     %{
       data: Enum.map(sandboxes, &format_sandbox_info/1),

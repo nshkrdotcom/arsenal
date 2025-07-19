@@ -6,8 +6,21 @@ defmodule Arsenal.Operations.Distributed.ClusterTopology do
   connectivity, and process distribution across the cluster.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl true
+  def name(), do: :cluster_topology
+
+  @impl true
+  def category(), do: :distributed
+
+  @impl true
+  def description(), do: "Get cluster topology information"
+
+  @impl true
+  def params_schema(), do: %{}
+
+  @impl true
   def rest_config do
     %{
       method: :get,
@@ -35,6 +48,7 @@ defmodule Arsenal.Operations.Distributed.ClusterTopology do
     }
   end
 
+  @impl true
   def validate_params(params) do
     # Convert string boolean parameters
     validated_params =
@@ -45,11 +59,13 @@ defmodule Arsenal.Operations.Distributed.ClusterTopology do
     {:ok, validated_params}
   end
 
+  @impl true
   def execute(_params) do
     # TODO: Implement cluster topology functionality when clustering is available
     {:error, :cluster_not_available}
   end
 
+  @impl true
   def format_response(topology) do
     %{
       data: topology,

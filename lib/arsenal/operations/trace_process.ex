@@ -3,8 +3,29 @@ defmodule Arsenal.Operations.TraceProcess do
   Operation to enable/disable process tracing with various options.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl true
+  def name(), do: :trace_process
+
+  @impl true
+  def category(), do: :process
+
+  @impl true
+  def description(), do: "Enable process tracing with specified flags"
+
+  @impl true
+  def params_schema() do
+    %{
+      pid: [type: :string, required: true],
+      trace_flags: [type: :list, default: ["send", "receive"]],
+      duration_ms: [type: :integer, default: 60_000],
+      max_events: [type: :integer, default: 1000],
+      filter_patterns: [type: :list, default: []]
+    }
+  end
+
+  @impl true
   def rest_config do
     %{
       method: :post,
@@ -72,6 +93,7 @@ defmodule Arsenal.Operations.TraceProcess do
     }
   end
 
+  @impl true
   def validate_params(%{"pid" => pid_string} = params) do
     with {:ok, pid} <- parse_pid(pid_string),
          {:ok, flags} <-
@@ -94,6 +116,7 @@ defmodule Arsenal.Operations.TraceProcess do
     {:error, {:missing_parameter, :pid}}
   end
 
+  @impl true
   def execute(%{
         "pid" => pid,
         "trace_flags" => flags,
@@ -111,6 +134,7 @@ defmodule Arsenal.Operations.TraceProcess do
     end
   end
 
+  @impl true
   def format_response(trace_info) do
     %{data: trace_info}
   end

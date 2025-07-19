@@ -6,8 +6,21 @@ defmodule Arsenal.Operations.Distributed.HordeRegistryInspect do
   registry, including their location, metadata, and health status.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl true
+  def name(), do: :horde_registry_inspect
+
+  @impl true
+  def category(), do: :distributed
+
+  @impl true
+  def description(), do: "Inspect Horde registry state"
+
+  @impl true
+  def params_schema(), do: %{}
+
+  @impl true
   def rest_config do
     %{
       method: :get,
@@ -43,6 +56,7 @@ defmodule Arsenal.Operations.Distributed.HordeRegistryInspect do
     }
   end
 
+  @impl true
   def validate_params(params) do
     validated_params =
       params
@@ -51,11 +65,13 @@ defmodule Arsenal.Operations.Distributed.HordeRegistryInspect do
     {:ok, validated_params}
   end
 
+  @impl true
   def execute(_params) do
     # TODO: Implement Horde registry inspection when clustering is available
     {:error, :cluster_not_available}
   end
 
+  @impl true
   def format_response(result) do
     %{
       data: result,

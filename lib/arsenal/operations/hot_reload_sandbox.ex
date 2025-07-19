@@ -3,8 +3,21 @@ defmodule Arsenal.Operations.HotReloadSandbox do
   Operation to hot reload a sandbox with updated code.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl true
+  def name(), do: :hot_reload_sandbox
+
+  @impl true
+  def category(), do: :sandbox
+
+  @impl true
+  def description(), do: "Hot reload code in a sandbox"
+
+  @impl true
+  def params_schema(), do: %{}
+
+  @impl true
   def rest_config do
     %{
       method: :post,
@@ -53,6 +66,7 @@ defmodule Arsenal.Operations.HotReloadSandbox do
     }
   end
 
+  @impl true
   def validate_params(%{"sandbox_id" => sandbox_id} = params) do
     validated_params = %{
       "sandbox_id" => validate_sandbox_id(sandbox_id),
@@ -64,10 +78,12 @@ defmodule Arsenal.Operations.HotReloadSandbox do
     error -> {:error, {:invalid_parameters, error}}
   end
 
+  @impl true
   def validate_params(_params) do
     {:error, {:missing_parameter, "sandbox_id is required"}}
   end
 
+  @impl true
   def execute(%{"sandbox_id" => sandbox_id, "module" => _module_name}) do
     # TODO: Replace with Arsenal.SandboxManager when available
     case get_sandbox_info_placeholder(sandbox_id) do
@@ -76,6 +92,7 @@ defmodule Arsenal.Operations.HotReloadSandbox do
     end
   end
 
+  @impl true
   def format_response(result) do
     %{data: result}
   end

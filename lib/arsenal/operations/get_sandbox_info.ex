@@ -3,8 +3,21 @@ defmodule Arsenal.Operations.GetSandboxInfo do
   Operation to get detailed information about a specific sandbox.
   """
 
-  use Arsenal.Operation, compat: true
+  use Arsenal.Operation
 
+  @impl true
+  def name(), do: :get_sandbox_info
+
+  @impl true
+  def category(), do: :sandbox
+
+  @impl true
+  def description(), do: "Get detailed information about a sandbox"
+
+  @impl true
+  def params_schema(), do: %{}
+
+  @impl true
   def rest_config do
     %{
       method: :get,
@@ -65,6 +78,7 @@ defmodule Arsenal.Operations.GetSandboxInfo do
     }
   end
 
+  @impl true
   def validate_params(%{"sandbox_id" => sandbox_id} = params) do
     validated_params = %{
       "sandbox_id" => validate_sandbox_id(sandbox_id),
@@ -77,10 +91,12 @@ defmodule Arsenal.Operations.GetSandboxInfo do
     error -> {:error, {:invalid_parameters, error}}
   end
 
+  @impl true
   def validate_params(_params) do
     {:error, {:missing_parameter, "sandbox_id is required"}}
   end
 
+  @impl true
   def execute(%{
         "sandbox_id" => sandbox_id,
         "include_children" => include_children,
@@ -97,6 +113,7 @@ defmodule Arsenal.Operations.GetSandboxInfo do
     end
   end
 
+  @impl true
   def format_response(sandbox_info) do
     %{
       data: sandbox_info
