@@ -286,10 +286,16 @@ defmodule Arsenal.SystemAnalyzerIntegrationTest do
       baseline_process_count = baseline_resources.processes.total_count
       _baseline_memory = baseline_resources.memory.used
 
+      # Get reference to test process for synchronization
+      test_pid = self()
+
       # Create measurable resource usage with controlled tasks
       resource_tasks =
         for _i <- 1..20 do
           Task.async(fn ->
+            # Signal that task has started
+            send(test_pid, {:task_started, self()})
+
             # Allocate memory and keep it - 1MB per process
             _memory = :binary.copy(<<0>>, 1_000_000)
 
@@ -301,8 +307,10 @@ defmodule Arsenal.SystemAnalyzerIntegrationTest do
           end)
         end
 
-      # Use sync to ensure resource allocation is processed
-      {:ok, {:ok, _}} = call_with_timeout(analyzer_pid, :get_analyzer_stats)
+      # Wait for all tasks to signal they've started
+      for _ <- 1..20 do
+        assert_receive {:task_started, _pid}, 1000
+      end
 
       # Measure resource usage under load
       {:ok, {:ok, loaded_resources}} = call_with_timeout(analyzer_pid, :get_resource_usage)
