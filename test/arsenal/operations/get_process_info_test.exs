@@ -30,8 +30,10 @@ defmodule Arsenal.Operations.GetProcessInfoTest do
     test "returns error for dead process" do
       # Create and kill a process
       pid = spawn(fn -> :ok end)
-      # Ensure process has died
-      Process.sleep(10)
+
+      # Wait for process to exit using monitor
+      ref = Process.monitor(pid)
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 100
 
       assert {:error, {:process_not_alive, ^pid}} = GetProcessInfo.execute(%{pid: pid})
     end

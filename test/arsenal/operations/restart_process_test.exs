@@ -74,8 +74,12 @@ defmodule Arsenal.Operations.RestartProcessTest do
     end
 
     test "returns error for dead process" do
+      # Create a process and ensure it exits
       pid = spawn(fn -> :ok end)
-      Process.sleep(10)
+
+      # Wait for process to exit using monitor
+      ref = Process.monitor(pid)
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 100
 
       assert {:error, :process_not_alive} =
                RestartProcess.execute(%{
