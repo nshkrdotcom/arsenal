@@ -172,17 +172,21 @@ defmodule Arsenal.Operations.CreateSandbox do
 
   defp validate_supervisor_module(module_string) when is_binary(module_string) do
     try do
-      # Convert string to module atom
-      module = String.to_existing_atom("Elixir." <> module_string)
+      # SAFE: Module.concat safely resolves known modules without creating new atoms
+      module = Module.concat([module_string])
 
       # Ensure the module is loaded first
-      Code.ensure_loaded(module)
-
-      # Verify the module exists and has start_link function
-      if function_exported?(module, :start_link, 1) do
-        module
-      else
-        raise "Module #{module_string} does not export start_link/1"
+      case Code.ensure_loaded(module) do
+        {:module, ^module} ->
+          # Verify the module exists and has start_link function
+          if function_exported?(module, :start_link, 1) do
+            module
+          else
+            raise "Module #{module_string} does not export start_link/1"
+          end
+        
+        {:error, _reason} ->
+          raise "Module #{module_string} could not be loaded"
       end
     rescue
       ArgumentError ->

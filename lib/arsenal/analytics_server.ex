@@ -672,12 +672,18 @@ defmodule Arsenal.AnalyticsServer do
   defp analyze_message_queues do
     processes = Process.list()
 
+    # PERFORMANCE: Process the queue length checks concurrently
     queue_lengths =
-      Enum.map(processes, fn pid ->
+      processes
+      |> Task.async_stream(fn pid ->
         case Process.info(pid, :message_queue_len) do
           {:message_queue_len, len} -> len
           nil -> 0
         end
+      end, max_concurrency: System.schedulers_online() * 2, ordered: false, timeout: 500)
+      |> Enum.flat_map(fn
+        {:ok, len} -> [len]
+        {:exit, _reason} -> [0] # Handle timeouts/crashes gracefully
       end)
 
     max_queue = Enum.max(queue_lengths, fn -> 0 end)
@@ -1124,22 +1130,32 @@ defmodule Arsenal.AnalyticsServer do
   end
 
   defp count_runnable_processes do
+    # PERFORMANCE: Process status checks concurrently
     Process.list()
-    |> Enum.count(fn pid ->
+    |> Task.async_stream(fn pid ->
       case Process.info(pid, :status) do
-        {:status, :runnable} -> true
-        _ -> false
+        {:status, :runnable} -> 1
+        _ -> 0
       end
+    end, max_concurrency: System.schedulers_online() * 2, ordered: false, timeout: 500)
+    |> Enum.reduce(0, fn
+      {:ok, count}, acc -> acc + count
+      {:exit, _reason}, acc -> acc # Handle timeouts/crashes gracefully
     end)
   end
 
   defp count_running_processes do
+    # PERFORMANCE: Process status checks concurrently
     Process.list()
-    |> Enum.count(fn pid ->
+    |> Task.async_stream(fn pid ->
       case Process.info(pid, :status) do
-        {:status, :running} -> true
-        _ -> false
+        {:status, :running} -> 1
+        _ -> 0
       end
+    end, max_concurrency: System.schedulers_online() * 2, ordered: false, timeout: 500)
+    |> Enum.reduce(0, fn
+      {:ok, count}, acc -> acc + count
+      {:exit, _reason}, acc -> acc # Handle timeouts/crashes gracefully
     end)
   end
 

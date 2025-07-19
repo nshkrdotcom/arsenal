@@ -146,7 +146,14 @@ defmodule Arsenal.Operations.SendMessage do
   end
 
   defp validate_message(nil), do: {:error, {:missing_parameter, :message}}
-  defp validate_message(message), do: {:ok, parse_message_content(message)}
+  defp validate_message(message) do
+    case parse_message_content(message) do
+      {:error, :invalid_message_type} -> 
+        {:error, {:invalid_parameter, :message, "invalid message type - must be one of: call, cast, info, custom_event, notification, signal"}}
+      parsed_message -> 
+        {:ok, parsed_message}
+    end
+  end
 
   defp validate_message_type(type) when type in ["send", "cast", "call"],
     do: {:ok, String.to_atom(type)}
@@ -165,10 +172,22 @@ defmodule Arsenal.Operations.SendMessage do
       nil ->
         message
 
-      type ->
-        # Convert to tuple format if type is specified
-        content = Map.get(message, "content", Map.delete(message, "type"))
-        {String.to_atom(type), content}
+      type when is_binary(type) ->
+        # SAFE: Validate the incoming type against a predefined list of allowed atoms
+        # to prevent atom exhaustion attacks
+        allowed_types = ["call", "cast", "info", "custom_event", "notification", "signal"]
+
+        if type in allowed_types do
+          # Convert to tuple format if type is valid
+          content = Map.get(message, "content", Map.delete(message, "type"))
+          {String.to_atom(type), content}
+        else
+          # Reject messages with unknown types to prevent atom exhaustion
+          {:error, :invalid_message_type}
+        end
+        
+      _invalid_type ->
+        {:error, :invalid_message_type}
     end
   end
 

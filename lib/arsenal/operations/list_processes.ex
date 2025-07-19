@@ -78,10 +78,18 @@ defmodule Arsenal.Operations.ListProcesses do
 
   @impl true
   def execute(%{limit: limit, sort_by: sort_by}) do
+    # PERFORMANCE: Process the list of PIDs concurrently to reduce execution time
     processes =
       Process.list()
-      |> Enum.map(&get_process_info/1)
-      |> Enum.filter(&(&1 != nil))
+      |> Task.async_stream(&get_process_info/1, 
+           max_concurrency: System.schedulers_online() * 2, 
+           ordered: false,
+           timeout: 1000)
+      |> Enum.flat_map(fn
+        {:ok, nil} -> []
+        {:ok, info} -> [info]
+        {:exit, _reason} -> [] # Handle timeouts/crashes gracefully
+      end)
       |> sort_processes(sort_by)
       |> Enum.take(limit)
 

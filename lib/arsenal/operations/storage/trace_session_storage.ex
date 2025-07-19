@@ -195,26 +195,25 @@ defmodule Arsenal.Operations.Storage.TraceSessionStorage do
   defp cleanup_expired_sessions_internal do
     current_time = System.monotonic_time(:millisecond)
 
-    expired_sessions =
-      @table_name
-      |> :ets.tab2list()
-      |> Enum.filter(fn {_trace_id, trace_info} ->
-        is_session_expired?(trace_info, current_time)
-      end)
+    # PERFORMANCE: Use :ets.select_delete/2 to efficiently delete expired sessions
+    # without loading all records into memory. This is much faster for large tables.
+    match_spec = [
+      {
+        # Pattern: {trace_id, trace_info}
+        {:"$1", :"$2"},
+        # Guard: check if session is expired
+        [
+          # Default duration is 60_000ms, stored_at defaults to current_time if missing
+          {">", {"-", current_time, {:map_get, :stored_at, :"$2", current_time}}, 
+           {:map_get, :duration, :"$2", 60_000}}
+        ],
+        # Return: true (delete the record)
+        [true]
+      }
+    ]
 
-    # Delete expired sessions
-    Enum.each(expired_sessions, fn {trace_id, _trace_info} ->
-      :ets.delete(@table_name, trace_id)
-    end)
-
-    length(expired_sessions)
+    # This directly deletes expired records and returns the count
+    :ets.select_delete(@table_name, match_spec)
   end
 
-  defp is_session_expired?(trace_info, current_time) do
-    stored_at = Map.get(trace_info, :stored_at, current_time)
-    # Default 60 seconds
-    duration = Map.get(trace_info, :duration, 60_000)
-
-    current_time - stored_at > duration
-  end
 end

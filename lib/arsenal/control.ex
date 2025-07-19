@@ -269,56 +269,72 @@ defmodule Arsenal.Control do
   # Private helper functions
 
   defp is_supervisor?(pid) do
-    # Try multiple methods to detect if a process is a supervisor
-    case Process.info(pid, :dictionary) do
-      {:dictionary, dict} ->
-        # Check for supervisor initial call patterns
-        has_supervisor_call =
-          Enum.any?(dict, fn
-            {:"$initial_call", {Supervisor, :init, 1}} ->
-              true
-
-            {:"$initial_call", {:supervisor, :init, 1}} ->
-              true
-
-            {:"$initial_call", {mod, :init, 1}} when is_atom(mod) ->
-              # Check if module name suggests it's a supervisor
-              mod_string = Atom.to_string(mod)
-              String.contains?(mod_string, "Supervisor") or String.contains?(mod_string, "_sup")
-
-            _ ->
-              false
-          end)
-
-        if has_supervisor_call do
-          true
-        else
-          # Try to call Supervisor.which_children/1 as a fallback test, but safely
-          try do
-            # Use a timeout to avoid hanging
-            case :gen_server.call(pid, :which_children, 100) do
-              children when is_list(children) -> true
-              _ -> false
+    # ROBUSTNESS: Use safe, non-blocking checks for supervisor detection
+    # Start with cheapest check - supervisors must trap exits
+    case Process.info(pid, :trap_exit) do
+      {:trap_exit, true} ->
+        # Process traps exits, could be a supervisor
+        # Check initial call pattern first for quick wins
+        case Process.info(pid, :initial_call) do
+          {:initial_call, initial_call} ->
+            if looks_like_supervisor?(initial_call) do
+              # Definitely looks like a supervisor, confirm with safe check
+              get_supervisor_details_safely(pid).is_supervisor
+            else
+              # Doesn't match supervisor patterns, but could still be one
+              # (e.g., kernel_sup has {:proc_lib, :init_p, 5})
+              # Use safe task-based check as fallback
+              get_supervisor_details_safely(pid).is_supervisor
             end
-          rescue
-            _ -> false
-          catch
-            :exit, _ -> false
-          end
+          _ ->
+            # No initial call info, use safe task-based check
+            get_supervisor_details_safely(pid).is_supervisor
         end
+      _ ->
+        false # Does not trap exits, cannot be a supervisor
+    end
+  rescue
+    ArgumentError -> false
+  end
+
+  # Check if the initial call looks like a supervisor
+  defp looks_like_supervisor?({:supervisor, _, _}), do: true
+  defp looks_like_supervisor?({Supervisor, :init, 1}), do: true
+  defp looks_like_supervisor?({module, _, _}) do
+    # Check if module name contains "Supervisor" or "Sup"
+    module_string = to_string(module)
+    String.contains?(module_string, "Supervisor") or 
+    String.contains?(module_string, "Sup") or
+    String.ends_with?(module_string, ".Supervisor")
+  end
+  defp looks_like_supervisor?(_), do: false
+
+  defp get_supervisor_details_safely(pid) do
+    # This task isolates the potentially blocking call in a separate process
+    task =
+      Task.async(fn ->
+        try do
+          # Supervisor.which_children/1 is a reliable check. If it succeeds, it's a supervisor.
+          children = Supervisor.which_children(pid)
+          %{is_supervisor: true, child_count: length(children)}
+        rescue
+          _ -> %{is_supervisor: false}
+        catch
+          :exit, _ -> %{is_supervisor: false}
+        end
+      end)
+
+    # Wait for a short period. A responsive supervisor will reply almost instantly.
+    # Non-supervisors will cause a timeout here, which we handle gracefully.
+    case Task.yield(task, 200) do
+      {:ok, result} ->
+        Task.shutdown(task)
+        result
 
       _ ->
-        # Try the Supervisor.which_children/1 test as last resort, but safely
-        try do
-          case :gen_server.call(pid, :which_children, 100) do
-            children when is_list(children) -> true
-            _ -> false
-          end
-        rescue
-          _ -> false
-        catch
-          :exit, _ -> false
-        end
+        # Task timed out or crashed.
+        Task.shutdown(task, :brutal_kill)
+        %{is_supervisor: false}
     end
   end
 
