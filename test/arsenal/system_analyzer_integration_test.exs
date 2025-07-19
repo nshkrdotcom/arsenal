@@ -164,7 +164,8 @@ defmodule Arsenal.SystemAnalyzerIntegrationTest do
       # Force some analysis to ensure data points are collected
       for _ <- 1..3 do
         {:ok, {:ok, _}} = call_with_timeout(analyzer_pid, :analyze_system_health)
-        Process.sleep(60)
+        # Use synchronous call to ensure processing completes
+        {:ok, _} = call_with_timeout(analyzer_pid, :get_analyzer_stats)
       end
 
       # Check that historical data is being collected
@@ -386,11 +387,9 @@ defmodule Arsenal.SystemAnalyzerIntegrationTest do
       {:ok, {:ok, initial_stats}} = call_with_timeout(analyzer_pid, :get_analyzer_stats)
       initial_uptime = initial_stats.uptime
 
-      # Wait a moment to ensure uptime increases
-      Process.sleep(100)
-
       # Use sync calls to ensure time passes and operations are processed
-      for _i <- 1..3 do
+      # Multiple calls ensure some time passes for uptime calculation
+      for _i <- 1..5 do
         {:ok, {:ok, _}} = call_with_timeout(analyzer_pid, :get_analyzer_stats)
       end
 
@@ -410,7 +409,8 @@ defmodule Arsenal.SystemAnalyzerIntegrationTest do
       # Force some analysis operations to ensure data points are collected
       for _ <- 1..3 do
         {:ok, {:ok, _}} = call_with_timeout(analyzer_pid, :analyze_system_health)
-        Process.sleep(60)
+        # Use synchronous call to ensure processing completes
+        {:ok, _} = call_with_timeout(analyzer_pid, :get_analyzer_stats)
       end
 
       {:ok, {:ok, data_stats}} = call_with_timeout(analyzer_pid, :get_analyzer_stats)
